@@ -1,0 +1,4146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevOps Infinity - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            dark: {
+              100: '#3E3E48',
+              200: '#33333D', 
+              300: '#2A2A33',
+              400: '#222229',
+              500: '#1A1A20',
+              600: '#15151A',
+              700: '#101014'
+            },
+            accent: {
+              purple: '#7563F8',
+              teal: '#56D7C6',
+              red: '#FF6B6B',
+              orange: '#FFB36B',
+              blue: '#63A1F8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      @apply bg-dark-500 text-gray-100;
+    }
+    .sidebar {
+      position: fixed;
+      height: 100%;
+      width: 4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+      left: 0;
+      top: 0;
+      background-color: #7563F8; /* Explicit purple color */
+      z-index: 50;
+    }
+      
+    /* Toggle switch styling */
+    .toggle-checkbox {
+      position: absolute;
+      right: 0;
+      top: 0;
+      z-index: 10;
+      border-color: #555555;
+      transition: all 0.3s;
+    }
+    .toggle-checkbox:checked {
+      right: 5px;
+      border-color: #7563F8;
+    }
+    .toggle-label {
+      width: 100%;
+      height: 100%;
+      background-color: #374151;
+      transition: background-color 0.3s;
+    }
+    .toggle-checkbox:checked + .toggle-label {
+      background-color: #7563F8;
+    }
+    .sidebar-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      background-color: rgba(30, 30, 35, 0.7);
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e5e5e5;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .sidebar-icon:hover {
+      background-color: rgba(50, 50, 55, 0.9);
+    }
+    .sidebar-icon.active {
+      background-color: rgba(50, 50, 55, 0.9);
+      color: white;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+    }
+    .dashboard-card {
+      @apply bg-dark-400 rounded-lg p-4 shadow-lg;
+    }
+    .stat-card {
+      @apply dashboard-card relative overflow-hidden;
+    }
+    .metric-value {
+      @apply text-2xl font-bold;
+    }
+    .metric-label {
+      @apply text-xs text-gray-400;
+    }
+    .progress-bar {
+      @apply h-2 rounded-full mt-2 bg-dark-300 relative overflow-hidden;
+    }
+    .progress-fill {
+      @apply h-full rounded-full absolute top-0 left-0;
+      min-width: 0%;
+    }
+    .story {
+      @apply bg-dark-300 p-3 rounded shadow-md mb-3 border-l-4 hover:shadow-lg transition-all duration-200 cursor-pointer hover:-translate-y-1;
+    }
+    .story.backlog {
+      @apply border-accent-teal;
+    }
+    .story.wip {
+      @apply border-accent-orange;
+    }
+    .story.deployed {
+      @apply border-accent-blue;
+    }
+    .incident {
+      @apply bg-dark-300 p-3 rounded shadow-md mb-3 border-l-4 border-accent-red;
+    }
+    .upgrade {
+      @apply bg-dark-300 p-3 rounded shadow-md mb-3 border-l-4 border-accent-purple;
+    }
+    .chart-line {
+      stroke: #56D7C6;
+      stroke-width: 2;
+      fill: none;
+    }
+    .chart-area {
+      fill: url(#gradient);
+      opacity: 0.2;
+    }
+    .chart-dot {
+      fill: #56D7C6;
+    }
+    .chart-grid {
+      stroke: #33333D;
+      stroke-width: 1;
+    }
+    .btn {
+      @apply px-3 py-1 rounded text-sm font-medium transition-colors;
+    }
+    .btn-blue {
+      @apply bg-accent-blue text-white hover:bg-opacity-80;
+    }
+    .btn-red {
+      @apply bg-accent-red text-white hover:bg-opacity-80;
+    }
+    .btn-purple {
+      @apply bg-accent-purple text-white hover:bg-opacity-80;
+    }
+    .btn-teal {
+      @apply bg-accent-teal text-white hover:bg-opacity-80;
+    }
+    .btn-disabled {
+      @apply opacity-50 cursor-not-allowed;
+    }
+    
+    /* Resource gain animations */
+    @keyframes floatUp {
+      0% {
+        opacity: 0;
+        transform: translateY(0);
+      }
+      10% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-80px);
+      }
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    
+    @keyframes glow {
+      0% {
+        box-shadow: 0 0 5px rgba(86, 215, 198, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 20px rgba(86, 215, 198, 0.7);
+      }
+      100% {
+        box-shadow: 0 0 5px rgba(86, 215, 198, 0.3);
+      }
+    }
+    
+    .resource-popup {
+      position: absolute;
+      font-weight: bold;
+      animation: floatUp 2s forwards;
+      z-index: 100;
+      text-shadow: 0px 0px 3px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+    
+    /* Resource popup animation */
+    .resource-popup {
+      position: absolute;
+      font-weight: bold;
+      font-size: 1rem;
+      pointer-events: none;
+      z-index: 100;
+      animation: float-up 2s ease-out forwards;
+      transform: translateX(-50%);
+      text-shadow: 0 0 3px rgba(0,0,0,0.8);
+    }
+    
+    @keyframes float-up {
+      0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(0);
+      }
+      20% {
+        opacity: 1;
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-30px);
+      }
+    }
+    
+    .pulse-animation {
+      animation: pulse 0.5s ease-in-out;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    
+    .glow-animation {
+      animation: glow 1s ease-in-out;
+    }
+    
+    @keyframes glow {
+      0% {
+        text-shadow: 0 0 0px rgba(255,255,255,0);
+      }
+      50% {
+        text-shadow: 0 0 10px rgba(255,255,255,0.8);
+      }
+      100% {
+        text-shadow: 0 0 0px rgba(255,255,255,0);
+      }
+    }
+    
+    /* Extra small text size */
+    .text-xxs {
+      font-size: 0.65rem;
+      line-height: 1rem;
+    }
+  </style>
+</head>
+<body class="bg-dark-500 min-h-screen text-white">
+  <!-- Loading state -->
+  <div id="loading" class="fixed inset-0 flex items-center justify-center bg-dark-700 z-50">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-purple mx-auto"></div>
+      <p class="mt-4 text-gray-300">Loading DevOps Infinity...</p>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div id="error" class="fixed inset-0 flex items-center justify-center bg-dark-700 z-50 hidden">
+    <div class="text-center max-w-md p-6 bg-dark-400 rounded-lg">
+      <svg class="w-16 h-16 text-accent-red mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <h2 class="text-xl font-bold mt-4 text-white">Something went wrong</h2>
+      <p id="error-message" class="mt-2 text-gray-300">Error loading game data.</p>
+      <button id="retry-button" class="mt-4 bg-accent-purple hover:bg-opacity-80 text-white px-4 py-2 rounded">
+        Try Again
+      </button>
+    </div>
+  </div>
+
+  <!-- Game content -->
+  <div id="game-content" class="hidden bg-dark-500 min-h-screen text-white p-4">
+  
+    <!-- Navigation Bar with Left/Right Alignment -->
+    <div class="mb-4 bg-[#7563F8] rounded-lg p-3 flex flex-wrap justify-between">
+      <!-- Left-aligned items -->
+      <div class="flex gap-2">
+        <a href="#" class="py-1 px-3 bg-transparent rounded text-white hover:bg-white/30 transition-colors"
+          id="nav-upgrades">
+          Upgrades
+        </a>
+        
+        <a href="#" class="py-1 px-3 bg-transparent rounded text-white hover:bg-white/30 transition-colors"
+          id="nav-settings">
+          Prioritization
+        </a>
+      </div>
+      
+      <!-- Right-aligned items -->
+      <div class="flex gap-2">
+        <a href="#" class="py-1 px-3 bg-transparent rounded text-white hover:bg-white/30 transition-colors"
+          id="reset-game">
+          Reset Game
+        </a>
+        
+        <a href="#" class="py-1 px-3 bg-transparent rounded text-white hover:bg-white/30 transition-colors"
+          id="nav-help">
+          Help
+        </a>
+      </div>
+    </div>
+    <!-- Top Menu Bar -->
+    <div class="top-menu bg-dark-400 rounded-lg p-4 shadow-lg mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold text-white">DevOps Dashboard</h1>
+        
+        <div class="flex items-center space-x-3">
+          <span class="text-sm text-gray-400">Last updated: <span id="last-updated" class="text-gray-200">-</span></span>
+          <button id="refresh-button" class="text-accent-teal hover:text-accent-blue transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Resources and Metrics in Top Menu -->
+      <div class="grid grid-cols-6 gap-4">
+        <!-- DevOps Points and Resources Request -->
+        <div class="col-span-2 bg-dark-300 rounded-lg p-3 flex flex-col">
+          <div class="flex items-center mb-2">
+            <svg class="w-6 h-6 mr-2 text-accent-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <span class="text-xs text-gray-400">DevOps Points</span>
+              <div class="text-xl font-bold" id="dp">0</div>
+            </div>
+          </div>
+          <button id="request-resources" class="mt-1 btn btn-teal text-xs self-start">
+            Ask for Resources (<span id="resources-remaining">3</span> left)
+          </button>
+        </div>
+        
+        <!-- Core Metrics -->
+        <div class="col-span-4 grid grid-cols-4 gap-3">
+          <!-- Deployment Frequency -->
+          <div class="bg-dark-300 p-2 rounded-lg">
+            <div class="flex items-center mb-1">
+              <svg class="w-4 h-4 mr-1 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+              <span class="text-xs text-gray-400">Deployment Frequency</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-lg font-bold" id="deploy-freq">0</span>
+              <div class="w-2/3">
+                <div class="progress-bar h-1.5">
+                  <div id="deploy-progress" class="progress-fill bg-accent-blue" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Availability -->
+          <div class="bg-dark-300 p-2 rounded-lg">
+            <div class="flex items-center mb-1">
+              <svg class="w-4 h-4 mr-1 text-accent-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span class="text-xs text-gray-400">Availability</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-lg font-bold" id="availability">100%</span>
+              <div class="w-2/3">
+                <div class="progress-bar h-1.5">
+                  <div id="availability-progress" class="progress-fill bg-accent-teal" style="width: 100%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Failure Rate -->
+          <div class="bg-dark-300 p-2 rounded-lg">
+            <div class="flex items-center mb-1">
+              <svg class="w-4 h-4 mr-1 text-accent-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span class="text-xs text-gray-400">Failure Rate</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-lg font-bold" id="failure-rate">0%</span>
+              <div class="w-2/3">
+                <div class="progress-bar h-1.5">
+                  <div id="failure-progress" class="progress-fill bg-accent-red" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Kanban Stats - Expandable -->
+          <div class="bg-dark-300 p-2 rounded-lg">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center">
+                <svg class="w-4 h-4 mr-1 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-xs text-gray-400">Kanban Metrics</span>
+              </div>
+              <button id="kanban-metrics-toggle" class="text-xs text-gray-400 hover:text-white">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+            <!-- Overall Metrics -->
+            <div class="grid grid-cols-2 gap-1 text-xs mb-1">
+              <div title="Average lead time across all work">
+                <span class="text-gray-400">Overall Lead Time:</span>
+                <span class="font-bold" id="lead-time">0</span>
+              </div>
+              <div title="Average cycle time across all work">
+                <span class="text-gray-400">Overall Cycle Time:</span>
+                <span class="font-bold" id="cycle-time">0</span>
+              </div>
+            </div>
+            <!-- Detailed Metrics (expandable) -->
+            <div id="detailed-metrics" class="hidden text-xs pt-1 border-t border-dark-500">
+              <div class="grid grid-cols-2 gap-1 mt-2">
+                <div title="Lead time for user stories only">
+                  <span class="text-accent-teal">Story Lead Time:</span>
+                  <span class="font-bold" id="story-lead-time">0</span>
+                </div>
+                <div title="Cycle time for user stories only">
+                  <span class="text-accent-teal">Story Cycle Time:</span>
+                  <span class="font-bold" id="story-cycle-time">0</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-1 mt-1">
+                <div title="Lead time for incidents only">
+                  <span class="text-accent-red">Incident Lead Time:</span>
+                  <span class="font-bold" id="incident-lead-time">0</span>
+                </div>
+                <div title="Cycle time for incidents only">
+                  <span class="text-accent-red">Incident Cycle Time:</span>
+                  <span class="font-bold" id="incident-cycle-time">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Main content -->
+    <div class="grid grid-cols-1 gap-6">
+      <!-- Cumulative Flow Diagram -->
+      <div class="dashboard-card p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">Cumulative Flow Diagram</h2>
+          <div class="flex items-center">
+            <div class="text-xs text-gray-400 mr-4">Shows work item distribution over time</div>
+            <div class="flex items-center">
+              <label for="cfd-window" class="text-gray-300 text-sm mr-2">Window:</label>
+              <select id="cfd-window" class="bg-dark-400 text-white text-sm rounded px-2 py-1 border border-dark-100">
+                <option value="10">10 ticks</option>
+                <option value="20">20 ticks</option>
+                <option value="30" selected>30 ticks</option>
+                <option value="50">50 ticks</option>
+                <option value="100">100 ticks</option>
+                <option value="0">All data</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="h-64 bg-dark-400 rounded-lg p-2">
+          <canvas id="cfd-chart"></canvas>
+        </div>
+      </div>
+      
+      <!-- Kanban board for stories -->
+      <div class="dashboard-card p-4">
+        <h2 class="text-xl font-bold mb-4">Development Pipeline</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Backlog Column -->
+          <div class="bg-dark-400 rounded-lg p-3 flex flex-col min-h-[400px]">
+            <div class="flex justify-between items-center border-b border-dark-300 pb-2 mb-3">
+              <h3 class="text-lg font-bold flex items-center">
+                <svg class="w-5 h-5 mr-2 text-accent-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span>Backlog</span>
+              </h3>
+              <div class="flex items-center space-x-2">
+                <span id="incidents-count" class="text-accent-red text-xs bg-dark-500 px-2 py-1 rounded flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>0</span>
+                </span>
+                <span id="stories-count" class="text-accent-teal text-xs bg-dark-500 px-2 py-1 rounded flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>0</span>
+                </span>
+                <span id="backlog-count" class="text-gray-400 text-sm bg-dark-500 px-2 py-1 rounded">(0)</span>
+                <button id="create-incident-btn" class="ml-2 bg-accent-red text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition-colors flex items-center">
+                  <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Create Incident
+                </button>
+              </div>
+            </div>
+            <div id="backlog-stories" class="overflow-y-auto flex-grow">
+              <p class="text-gray-400 text-sm">No stories in backlog</p>
+            </div>
+          </div>
+          
+          <!-- Work In Progress Column -->
+          <div class="bg-dark-400 rounded-lg p-3 flex flex-col min-h-[400px]">
+            <div class="flex justify-between items-center border-b border-dark-300 pb-2 mb-3">
+              <h3 class="text-lg font-bold flex items-center">
+                <svg class="w-5 h-5 mr-2 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>In Progress</span>
+              </h3>
+              <div class="flex items-center">
+                <span class="text-xs text-accent-orange mr-2 bg-dark-500 px-2 py-1 rounded" title="Work in Progress Limit: Focus on completing existing tasks before starting new ones">
+                  Limit: 3
+                </span>
+                <span id="wip-count" class="text-gray-400 text-sm bg-dark-500 px-2 py-1 rounded">(0)</span>
+              </div>
+            </div>
+            <div id="wip-stories" class="overflow-y-auto flex-grow">
+              <p class="text-gray-400 text-sm">No stories in WIP</p>
+            </div>
+          </div>
+          
+          <!-- Deployed Column -->
+          <div class="bg-dark-400 rounded-lg p-3 flex flex-col min-h-[400px]">
+            <div class="flex justify-between items-center border-b border-dark-300 pb-2 mb-3">
+              <h3 class="text-lg font-bold flex items-center">
+                <svg class="w-5 h-5 mr-2 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+                <span>Deployed</span>
+              </h3>
+              <span id="deployed-count" class="text-gray-400 text-sm bg-dark-500 px-2 py-1 rounded">(0)</span>
+            </div>
+            <div id="deployed-stories" class="overflow-y-auto flex-grow">
+              <p class="text-gray-400 text-sm">No stories deployed</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Incidents Section -->
+      <div class="dashboard-card">
+        <h2 class="text-lg font-bold mb-3 flex items-center">
+          <svg class="w-5 h-5 mr-2 text-accent-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>Active Incidents</span>
+        </h2>
+        <div id="incidents-list" class="max-h-80 overflow-y-auto">
+          <p class="text-gray-400">No active incidents</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script>
+    // Global variable for CFD chart
+    let cfdChart = null;
+    
+    // Variables for chart updates
+    let lastChartUpdateTime = 0;
+    
+    // Function to initialize and update CFD chart
+    function updateCfdChart() {
+      const cfdCanvas = document.getElementById('cfd-chart');
+      if (!cfdCanvas || !gameState.metrics.cfdData || gameState.metrics.cfdData.length === 0) {
+        return; // Exit if no canvas or data
+      }
+      
+      // Get current time (for tracking last update)
+      const now = Date.now();
+      
+      // Get the selected window size from the dropdown
+      const windowSelector = document.getElementById('cfd-window');
+      const windowSize = parseInt(windowSelector ? windowSelector.value : 30);
+      
+      // Calculate the dynamic minimum value for Y axis: Max(deployed - 3, 0)
+      const cfdData = gameState.metrics.cfdData;
+      const dataLength = cfdData.length;
+      
+      // Show data based on the selected window size
+      // If windowSize is 0, show all data
+      const startPoint = windowSize > 0 ? Math.max(0, dataLength - windowSize) : 0;
+      
+      // Get min values from the visible window of data
+      const visibleData = cfdData.slice(startPoint);
+      const deployedData = visibleData.map(data => data.deployed);
+      
+      // Calculate min deployed value in the visible window
+      const minDeployed = deployedData.length > 0 ? Math.min(...deployedData) : 0;
+      
+      // Set the Y-axis minimum to slightly less than the minimum deployed value
+      // but not less than zero
+      const dynamicMinY = Math.max(minDeployed - 3, 0);
+      
+      // Format the data for Chart.js
+      const labels = gameState.metrics.cfdData.slice(startPoint).map((data, index) => {
+        return `Tick ${startPoint + index + 1}`;
+      });
+      
+      const data = {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Total Work Items',
+            data: gameState.metrics.cfdData.slice(startPoint).map(data => data.backlog), // Total of all work
+            backgroundColor: 'rgba(117, 99, 248, 0.5)', // Purple for total
+            borderColor: 'rgba(117, 99, 248, 1)',
+            borderWidth: 1,
+            fill: true
+          },
+          {
+            label: 'Work in Progress + Deployed',
+            data: gameState.metrics.cfdData.slice(startPoint).map(data => data.wip), // WIP + Deployed
+            backgroundColor: 'rgba(249, 115, 22, 0.5)', // Orange for WIP
+            borderColor: 'rgba(249, 115, 22, 1)',
+            borderWidth: 1,
+            fill: true
+          },
+          {
+            label: 'Deployed Only',
+            data: gameState.metrics.cfdData.slice(startPoint).map(data => data.deployed), // Just Deployed
+            backgroundColor: 'rgba(59, 130, 246, 0.5)', // Blue for deployed
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 1,
+            fill: true
+          }
+        ]
+      };
+      
+      const config = {
+        type: 'line',
+        data: data,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {
+            duration: cfdChart ? 0 : 1000 // No animation for updates, only for initial creation
+          },
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              },
+              ticks: {
+                color: 'rgba(255, 255, 255, 0.7)'
+              }
+            },
+            y: {
+              stacked: false, // Not stacked in traditional sense - using fill: true instead
+              beginAtZero: false, // Changed to false to support dynamic min
+              min: dynamicMinY, // Use our dynamically calculated min value
+              grid: {
+                color: 'rgba(255, 255, 255, 0.1)'
+              },
+              ticks: {
+                color: 'rgba(255, 255, 255, 0.7)'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false  // Hide the legend
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                title: function(context) {
+                  return 'Time: ' + context[0].label;
+                },
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.y !== null) {
+                    label += context.parsed.y + ' stories';
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          elements: {
+            line: {
+              tension: 0.2 // Slightly curved lines
+            }
+          }
+        }
+      };
+      
+      // Create or update chart
+      if (cfdChart) {
+        cfdChart.data = data;
+        // Update min value in the scale options
+        cfdChart.options.scales.y.min = dynamicMinY;
+        cfdChart.update('none'); // Use 'none' mode to disable all animations for updates
+      } else {
+        cfdChart = new Chart(cfdCanvas, config);
+      }
+      
+      // Update last chart update time
+      lastChartUpdateTime = now;
+    }
+    
+    // Toast notification queue and functionality
+    const toastQueue = [];
+    let activeToasts = 0;
+    const MAX_VISIBLE_TOASTS = 3;
+    
+    function showToast(message, type = 'info') {
+      // Add to queue
+      toastQueue.push({ message, type });
+      
+      // Process queue
+      processToastQueue();
+    }
+    
+    // Process toast queue
+    function processToastQueue() {
+      // If there are items in the queue and we're under the max visible limit, show next toast
+      if (toastQueue.length > 0 && activeToasts < MAX_VISIBLE_TOASTS) {
+        const { message, type } = toastQueue.shift();
+        displayToast(message, type);
+        activeToasts++;
+      }
+    }
+    
+    // Actually display a toast
+    function displayToast(message, type) {
+      // Create toast element
+      const toast = document.createElement('div');
+      
+      let bgColor = 'bg-dark-400';
+      let iconSvg = '';
+      
+      // Set appropriate colors based on type
+      switch(type) {
+        case 'success':
+          bgColor = 'bg-accent-teal bg-opacity-90';
+          iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+          break;
+        case 'error':
+          bgColor = 'bg-accent-red bg-opacity-90';
+          iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+          
+          // Check if this is a WIP limit error for enhanced styling
+          if (message.includes('WIP limit reached')) {
+            bgColor = 'bg-accent-red bg-opacity-95';
+            toast.style.borderLeft = '4px solid #ef4444';
+            toast.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.3)';
+          }
+          break;
+        case 'warning':
+          bgColor = 'bg-accent-orange bg-opacity-90';
+          iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+          break;
+        default: // info
+          bgColor = 'bg-dark-400';
+          iconSvg = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+      }
+      
+      // Get existing toasts to calculate position
+      const existingToasts = document.querySelectorAll('.toast-notification');
+      const position = existingToasts.length;
+      
+      // Calculate offset for stacking
+      const bottomOffset = 16 + (position * 68); // 16px base + height of each previous toast
+      
+      toast.className = `toast-notification fixed right-4 ${bgColor} text-white px-4 py-3 rounded shadow-lg flex items-center`;
+      toast.style.zIndex = '1000';
+      toast.style.bottom = `${bottomOffset}px`;
+      toast.style.transition = 'all 0.3s ease-out, opacity 0.5s ease-out';
+      
+      // Add icon and message
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'flex items-center';
+      contentDiv.innerHTML = iconSvg;
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.textContent = message;
+      contentDiv.appendChild(messageSpan);
+      
+      // Add close button
+      const closeBtn = document.createElement('div');
+      closeBtn.className = 'ml-3 cursor-pointer opacity-70 hover:opacity-100';
+      closeBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+      closeBtn.onclick = () => {
+        removeToast(toast);
+      };
+      contentDiv.appendChild(closeBtn);
+      
+      toast.appendChild(contentDiv);
+      
+      // Add to document
+      document.body.appendChild(toast);
+      
+      // Determine toast display duration
+      let displayTime = 3500; // default 3.5 seconds
+      
+      // WIP limit errors should stay longer to ensure the user sees the message
+      if (message.includes('WIP limit reached')) {
+        displayTime = 5000; // 5 seconds for WIP limit errors
+      }
+      
+      // Remove after display time
+      const timeoutId = setTimeout(() => {
+        removeToast(toast);
+      }, displayTime);
+      
+      // Store timeout ID on the toast element for potential cancellation
+      toast.dataset.timeoutId = timeoutId;
+    }
+    
+    // Function to remove a toast notification
+    function removeToast(toast) {
+      // Cancel timeout if it exists
+      if (toast.dataset.timeoutId) {
+        clearTimeout(parseInt(toast.dataset.timeoutId));
+      }
+      
+      // Fade out with animation
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(20px)';
+      
+      // Remove after animation
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+          activeToasts--;
+          
+          // Reposition remaining toasts
+          const toasts = document.querySelectorAll('.toast-notification');
+          toasts.forEach((t, index) => {
+            t.style.bottom = `${16 + (index * 68)}px`;
+          });
+          
+          // Process next toast in queue if any
+          processToastQueue();
+        }
+      }, 300);
+    }
+    
+    // Show resource gain animation
+    function showResourceGain(element, amount, colorClass) {
+      // Create the floating text element
+      const popup = document.createElement('div');
+      popup.className = `resource-popup text-${colorClass}`;
+      popup.textContent = amount;
+      
+      // Position it near the element
+      const rect = element.getBoundingClientRect();
+      popup.style.left = `${rect.left + rect.width / 2}px`;
+      popup.style.top = `${rect.top}px`;
+      
+      // Add to DOM
+      document.body.appendChild(popup);
+      
+      // Remove after animation completes
+      setTimeout(() => {
+        popup.parentNode.removeChild(popup);
+      }, 2000);
+    }
+    
+    // Game state
+    let gameState = {
+      metrics: {
+        devopsPoints: 0,
+        deploymentFrequency: 0,
+        availability: 100,
+        changeFailureRate: 0,
+        lastUpdateTime: new Date(),
+        // Kanban metrics
+        leadTimeSum: 0,          // Total lead time in milliseconds
+        leadTimeSampleCount: 0,  // Number of stories used for lead time calculation
+        averageLeadTime: 0,      // Average lead time in days
+        cycleTimeSum: 0,         // Total cycle time in milliseconds
+        cycleTimeSampleCount: 0, // Number of stories used for cycle time calculation
+        averageCycleTime: 0,     // Average cycle time in days
+        // CFD tracking - store counts for cumulative flow diagram
+        cfdData: [
+          // Will store entries like: {date: timestamp, backlog: n, wip: m, deployed: p}
+          // Added as items move through the workflow
+        ],
+        lastCfdUpdate: new Date()
+      },
+      stories: {
+        backlog: [],
+        wip: [],
+        deployed: []
+      },
+      upgrades: [],
+      incidents: [],
+      prioritizationWeights: {
+        benefitWeight: 1.5,
+        penaltyWeight: 1.5,
+        estimateWeight: 1.5,
+        riskWeight: 1.5
+      },
+      resourceRequestsRemaining: 3
+    };
+
+    // Game intervals
+    let gameLoopInterval;
+    let storyGenerationTimeout;
+    let incidentGenerationTimeout;
+
+    // DOM Elements
+    const loadingElement = document.getElementById('loading');
+    const errorElement = document.getElementById('error');
+    const errorMessageElement = document.getElementById('error-message');
+    const retryButton = document.getElementById('retry-button');
+    const gameContentElement = document.getElementById('game-content');
+    const refreshButton = document.getElementById('refresh-button');
+    // Save game happens automatically
+    // Add a hidden test button that can be triggered from console
+    const testToastsButton = document.createElement('button');
+    testToastsButton.id = 'test-toasts';
+    testToastsButton.style.display = 'none';
+    document.body.appendChild(testToastsButton);
+    const lastUpdatedElement = document.getElementById('last-updated');
+    
+    // Metrics elements
+    const dpElement = document.getElementById('dp');
+    const deployFreqElement = document.getElementById('deploy-freq');
+    const availabilityElement = document.getElementById('availability');
+    const failureRateElement = document.getElementById('failure-rate');
+    
+    // Story elements
+    const backlogCountElement = document.getElementById('backlog-count');
+    const wipCountElement = document.getElementById('wip-count');
+    const deployedCountElement = document.getElementById('deployed-count');
+    const incidentsCountElement = document.getElementById('incidents-count').querySelector('span');
+    const storiesCountElement = document.getElementById('stories-count').querySelector('span');
+    const backlogStoriesElement = document.getElementById('backlog-stories');
+    const wipStoriesElement = document.getElementById('wip-stories');
+    const deployedStoriesElement = document.getElementById('deployed-stories');
+    
+    // Other elements
+    const incidentsListElement = document.getElementById('incidents-list');
+    const resourcesRemainingElement = document.getElementById('resources-remaining');
+    const requestResourcesButton = document.getElementById('request-resources');
+    
+    // Initialize the game data
+    initializeGame();
+    
+    // Event listeners
+    refreshButton.addEventListener('click', refreshGameState);
+    retryButton.addEventListener('click', initializeGame);
+    // Save game happens automatically at regular intervals
+    document.getElementById('reset-game').addEventListener('click', resetGame);
+    requestResourcesButton.addEventListener('click', requestResources);
+    testToastsButton.addEventListener('click', testToastNotifications);
+    document.getElementById('create-incident-btn').addEventListener('click', createRandomIncident);
+    
+    // Add event listener for CFD window selector
+    const cfdWindowSelector = document.getElementById('cfd-window');
+    if (cfdWindowSelector) {
+      cfdWindowSelector.addEventListener('change', function() {
+        // Force update the chart when window size changes
+        lastChartUpdateTime = 0; // Reset the throttle timer
+        updateCfdChart();
+      });
+    }
+    
+    // Add Kanban metrics toggle button listener
+    const kanbanToggleBtn = document.getElementById('kanban-metrics-toggle');
+    if (kanbanToggleBtn) {
+      kanbanToggleBtn.addEventListener('click', function() {
+        const detailedMetrics = document.getElementById('detailed-metrics');
+        if (detailedMetrics) {
+          if (detailedMetrics.classList.contains('hidden')) {
+            // Show detailed metrics
+            detailedMetrics.classList.remove('hidden');
+            this.innerHTML = `
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+              </svg>
+            `;
+          } else {
+            // Hide detailed metrics
+            detailedMetrics.classList.add('hidden');
+            this.innerHTML = `
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            `;
+          }
+        }
+      });
+    }
+    
+    // Function to test toast notifications (can be triggered from console via document.getElementById('test-toasts').click())
+    function testToastNotifications() {
+      showToast("This is an info notification", "info");
+      showToast("This is a success notification", "success");
+      showToast("This is a warning notification", "warning");
+      showToast("This is an error notification", "error");
+      showToast("This is another info notification that should be queued", "info");
+      showToast("WIP limit reached (3)! Complete existing stories before starting new ones.", "error");
+    }
+    
+    // Sidebar navigation
+    const navDashboard = document.getElementById('nav-dashboard');
+    const navStories = document.getElementById('nav-stories');
+    const navUpgrades = document.getElementById('nav-upgrades');
+    const navSettings = document.getElementById('nav-settings');
+    const navHelp = document.getElementById('nav-help');
+    
+    // Initialize navigation
+    setupNavigation();
+
+    // Initialize the game
+    function initializeGame() {
+      showLoading();
+      try {
+        // Try to load saved game first
+        if (loadGameFromLocalStorage(false)) {
+          console.log('Loaded saved game');
+        } else {
+          // Generate initial game data if no saved game
+          generateInitialGameData();
+        }
+        
+        // Start game loop
+        startGameLoop();
+        
+        // Update UI
+        updateUI();
+        hideLoading();
+        showGameContent();
+        updateLastUpdated();
+      } catch (error) {
+        console.error('Failed to initialize game:', error);
+        showError(error.message || 'Failed to initialize game');
+      }
+    }
+    
+    // Refresh the game state
+    function refreshGameState() {
+      try {
+        // Update game state
+        gameLoop();
+        updateUI();
+        updateLastUpdated();
+      } catch (error) {
+        console.error('Failed to refresh game state:', error);
+        showError(error.message || 'Failed to refresh game state');
+      }
+    }
+    
+    // Save game to local storage
+    function saveGameToLocalStorage() {
+      try {
+        localStorage.setItem('devops-infinity-save', JSON.stringify(gameState));
+        showToast('Game saved successfully!', 'success');
+      } catch (error) {
+        console.error('Failed to save game:', error);
+        showToast('Failed to save game: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
+    
+    // Reset game state
+    function resetGame() {
+      if (confirm('Are you sure you want to reset the game? All progress will be lost!')) {
+        try {
+          // Clear saved game from localStorage
+          localStorage.removeItem('devops-infinity-save');
+          localStorage.removeItem('devops-infinity-last-save');
+          
+          // Reset game state to initial values
+          gameState = {
+            metrics: {
+              devopsPoints: 0,
+              deploymentFrequency: 0,
+              availability: 100,
+              changeFailureRate: 0,
+              lastUpdateTime: new Date(),
+              // Reset Kanban metrics
+              leadTimeSum: 0,
+              leadTimeSampleCount: 0,
+              averageLeadTime: 0,
+              cycleTimeSum: 0,
+              cycleTimeSampleCount: 0,
+              averageCycleTime: 0,
+              // Reset CFD data
+              cfdData: [],
+              lastCfdUpdate: new Date()
+            },
+            stories: {
+              backlog: [],
+              wip: [],
+              deployed: []
+            },
+            upgrades: [],
+            incidents: [],
+            prioritizationWeights: {
+              benefitWeight: 1.5,
+              penaltyWeight: 1.5,
+              estimateWeight: 1.5,
+              riskWeight: 1.5
+            },
+            resourceRequestsRemaining: 3
+          };
+          
+          // Re-initialize the game
+          generateInitialGameData();
+          
+          // Update UI
+          updateUI();
+          
+          showToast('Game reset successfully! New upgrades are now available.', 'success');
+        } catch (error) {
+          console.error('Failed to reset game:', error);
+          showToast('Failed to reset game: ' + (error.message || 'Unknown error'), 'error');
+        }
+      }
+    }
+    
+    // Load game from local storage
+    function loadGameFromLocalStorage(showMessage = true) {
+      try {
+        const savedGame = localStorage.getItem('devops-infinity-save');
+        
+        if (savedGame) {
+          // Parse saved game
+          const parsedGame = JSON.parse(savedGame);
+          
+          // Convert date strings back to Date objects
+          parsedGame.metrics.lastUpdateTime = new Date(parsedGame.metrics.lastUpdateTime);
+          
+          // Handle CFD data and dates if they exist
+          if (parsedGame.metrics.lastCfdUpdate) {
+            parsedGame.metrics.lastCfdUpdate = new Date(parsedGame.metrics.lastCfdUpdate);
+          } else {
+            // Initialize for backward compatibility with older saves
+            parsedGame.metrics.lastCfdUpdate = new Date();
+          }
+          
+          // Initialize CFD data if it doesn't exist
+          if (!parsedGame.metrics.cfdData) {
+            parsedGame.metrics.cfdData = [];
+            
+            // Add initial data point using current state
+            const now = new Date();
+            parsedGame.metrics.cfdData.push({
+              date: now.getTime(),
+              backlog: parsedGame.stories.backlog.length,
+              wip: parsedGame.stories.wip.length, 
+              deployed: parsedGame.stories.deployed.length,
+              total: parsedGame.stories.backlog.length + parsedGame.stories.wip.length + parsedGame.stories.deployed.length
+            });
+          }
+          
+          // Initialize Kanban metrics if they don't exist (for backward compatibility)
+          if (typeof parsedGame.metrics.leadTimeSum === 'undefined') {
+            parsedGame.metrics.leadTimeSum = 0;
+            parsedGame.metrics.leadTimeSampleCount = 0;
+            parsedGame.metrics.averageLeadTime = 0;
+          }
+          
+          if (typeof parsedGame.metrics.cycleTimeSum === 'undefined') {
+            parsedGame.metrics.cycleTimeSum = 0;
+            parsedGame.metrics.cycleTimeSampleCount = 0;
+            parsedGame.metrics.averageCycleTime = 0;
+          }
+          
+          // CFD data is already initialized above if it doesn't exist
+          
+          parsedGame.stories.backlog.forEach(story => {
+            if (story.startTime) story.startTime = new Date(story.startTime);
+            if (story.endTime) story.endTime = new Date(story.endTime);
+          });
+          
+          parsedGame.stories.wip.forEach(story => {
+            if (story.startTime) story.startTime = new Date(story.startTime);
+            if (story.endTime) story.endTime = new Date(story.endTime);
+          });
+          
+          parsedGame.stories.deployed.forEach(story => {
+            if (story.startTime) story.startTime = new Date(story.startTime);
+            if (story.endTime) story.endTime = new Date(story.endTime);
+          });
+          
+          parsedGame.incidents.forEach(incident => {
+            if (incident.startTime) incident.startTime = new Date(incident.startTime);
+            if (incident.endTime) incident.endTime = new Date(incident.endTime);
+          });
+          
+          // Update game state
+          gameState = parsedGame;
+          
+          // Make sure resourceRequestsRemaining exists (for compatibility with older saves)
+          if (typeof gameState.resourceRequestsRemaining === 'undefined') {
+            gameState.resourceRequestsRemaining = 3;
+          }
+          
+          // Update UI
+          updateUI();
+          
+          if (showMessage) {
+            showToast('Game loaded successfully!', 'success');
+          }
+          
+          return true;
+        } else {
+          if (showMessage) {
+            showToast('No saved game found.', 'warning');
+          }
+          return false;
+        }
+      } catch (error) {
+        console.error('Failed to load game:', error);
+        if (showMessage) {
+          showToast('Failed to load game: ' + (error.message || 'Unknown error'), 'error');
+        }
+        return false;
+      }
+    }
+    
+    // Generate initial game data
+    function generateInitialGameData() {
+      // Initialize CFD data
+      gameState.metrics.cfdData = [];
+      
+      // Add initial data point with cumulative values
+      const now = new Date();
+      const initialBacklogCount = 5; // We'll add 5 initial stories
+      
+      gameState.metrics.cfdData.push({
+        date: now.getTime(),
+        backlog: initialBacklogCount, // Total sum of all work
+        wip: 0, // No WIP + Deployed at start
+        deployed: 0, // No Deployed at start
+        total: initialBacklogCount
+      });
+      
+      // Create initial stories
+      for (let i = 0; i < 5; i++) {
+        gameState.stories.backlog.push(generateStory());
+      }
+      
+      // Create initial upgrades based on DevOps culture & automation principles
+      gameState.upgrades = [
+        // DevTeams Category
+        {
+          id: 1,
+          upgradeId: "upgrade-dev-culture-1",
+          name: "Cross-Functional Training I",
+          description: "Improves team collaboration by providing cross-functional training. Increases Dev Team efficiency by 5%.",
+          cost: 150,
+          effectType: "TEAM_EFFICIENCY",
+          effectValue: 1.05,
+          category: "DevTeams",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: true,
+          prerequisites: []
+        },
+        {
+          id: 2,
+          upgradeId: "upgrade-dev-culture-2",
+          name: "Agile Methodology Adoption",
+          description: "Implements Agile methodologies for faster iteration and feedback. Reduces Base WIP Duration of stories by 10%.",
+          cost: 300,
+          effectType: "WIP_DURATION",
+          effectValue: 0.9,
+          category: "DevTeams",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-dev-culture-1-level-2"]
+        },
+        {
+          id: 3,
+          upgradeId: "upgrade-dev-culture-3",
+          name: "Improved Communication Channels",
+          description: "Establishes better communication channels within teams. Further increases Dev Team efficiency by 7%.",
+          cost: 400,
+          effectType: "TEAM_EFFICIENCY",
+          effectValue: 1.07,
+          category: "DevTeams",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: false,
+          prerequisites: ["upgrade-dev-culture-2"]
+        },
+        {
+          id: 4,
+          upgradeId: "upgrade-dev-culture-4",
+          name: "DevOps Culture Workshops",
+          description: "Conducts workshops to instill DevOps culture principles. Reduces Risk score of newly generated stories by 5% (average).",
+          cost: 600,
+          effectType: "RISK_REDUCTION",
+          effectValue: -0.05,
+          category: "DevTeams",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-dev-culture-3-level-3"]
+        },
+        {
+          id: 5,
+          upgradeId: "upgrade-dev-culture-5",
+          name: "Continuous Learning Program",
+          description: "Implements a continuous learning program to enhance team skills. Increases Dev Team efficiency by an additional 10%.",
+          cost: 800,
+          effectType: "TEAM_EFFICIENCY",
+          effectValue: 1.1,
+          category: "DevTeams",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: false,
+          prerequisites: ["upgrade-dev-culture-4"]
+        },
+        
+        // Automation Category
+        {
+          id: 6,
+          upgradeId: "upgrade-automation-1",
+          name: "Automated Build Process",
+          description: "Automates the build process for faster iteration cycles. Increases Deployment Frequency by 5%.",
+          cost: 200,
+          effectType: "DEPLOYMENT_FREQUENCY",
+          effectValue: 5,
+          category: "Automation",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: true,
+          prerequisites: []
+        },
+        {
+          id: 7,
+          upgradeId: "upgrade-automation-2",
+          name: "Continuous Integration (CI) System",
+          description: "Implements a CI system for automated code integration and early issue detection. Reduces Lead Time for Changes by 10%.",
+          cost: 400,
+          effectType: "LEAD_TIME",
+          effectValue: 0.9,
+          category: "Automation",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-automation-1-level-2"]
+        },
+        {
+          id: 8,
+          upgradeId: "upgrade-automation-3",
+          name: "Automated Deployment Pipeline (CD)",
+          description: "Automates the deployment pipeline to staging and production. Increases Deployment Frequency by an additional 10% and further reduces Lead Time by 15%.",
+          cost: 600,
+          effectType: "DEPLOYMENT_CD",
+          effectValue: {df: 10, lt: 0.85},
+          category: "Automation",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-automation-2"]
+        },
+        {
+          id: 9,
+          upgradeId: "upgrade-automation-4",
+          name: "Infrastructure as Code (IaC)",
+          description: "Adopts Infrastructure as Code for automated infrastructure management. Reduces Infrastructure Cost by 15%.",
+          cost: 700,
+          effectType: "INFRA_COST_REDUCTION",
+          effectValue: 0.85,
+          category: "Automation",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-automation-3"]
+        },
+        {
+          id: 10,
+          upgradeId: "upgrade-automation-5",
+          name: "Self-Healing Infrastructure",
+          description: "Implements self-healing infrastructure to automatically recover from failures. Improves Mean Time to Recovery (MTTR) by 20%.",
+          cost: 900,
+          effectType: "MTTR_IMPROVEMENT",
+          effectValue: 0.8,
+          category: "Automation", 
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-automation-4"]
+        },
+        
+        // Testing Category
+        {
+          id: 11,
+          upgradeId: "upgrade-testing-1",
+          name: "Automated Unit Tests I",
+          description: "Implements basic automated unit tests. Increases Test Coverage by 5%.",
+          cost: 180,
+          effectType: "TEST_COVERAGE",
+          effectValue: 5,
+          category: "Testing",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: true,
+          prerequisites: []
+        },
+        {
+          id: 12,
+          upgradeId: "upgrade-testing-2",
+          name: "Integration Testing Framework",
+          description: "Introduces an integration testing framework for end-to-end testing. Increases Test Coverage by an additional 7%.",
+          cost: 350,
+          effectType: "TEST_COVERAGE",
+          effectValue: 7,
+          category: "Testing",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-testing-1-level-2"]
+        },
+        {
+          id: 13,
+          upgradeId: "upgrade-testing-3",
+          name: "Performance Testing Tools",
+          description: "Implements performance testing tools to identify bottlenecks. Reduces Error Rate by 10%.",
+          cost: 500,
+          effectType: "ERROR_RATE_REDUCTION",
+          effectValue: 0.9,
+          category: "Testing",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-testing-2"]
+        },
+        {
+          id: 14,
+          upgradeId: "upgrade-testing-4",
+          name: "Test-Driven Development (TDD) Training",
+          description: "Provides TDD training to developers to improve code quality proactively. Increases Test Coverage by a further 8%.",
+          cost: 650,
+          effectType: "TEST_COVERAGE",
+          effectValue: 8,
+          category: "Testing",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-testing-3"]
+        },
+        {
+          id: 15,
+          upgradeId: "upgrade-testing-5",
+          name: "Automated Regression Testing Suite",
+          description: "Implements a comprehensive automated regression testing suite. Reduces Change Failure Rate (CFR) by 15%.",
+          cost: 850,
+          effectType: "CFR_REDUCTION",
+          effectValue: 0.85,
+          category: "Testing",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-testing-4"]
+        },
+        
+        // Security Category
+        {
+          id: 16,
+          upgradeId: "upgrade-security-1",
+          name: "Static Application Security Testing (SAST)",
+          description: "Integrates SAST tools for early vulnerability detection in code. Reduces Security Vulnerability Count by 10% (base reduction).",
+          cost: 250,
+          effectType: "SEC_VULNERABILITY_REDUCTION",
+          effectValue: -10,
+          category: "Security",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: true,
+          prerequisites: []
+        },
+        {
+          id: 17,
+          upgradeId: "upgrade-security-2",
+          name: "Dynamic Application Security Testing (DAST)",
+          description: "Implements DAST tools for runtime vulnerability scanning. Further reduces Security Vulnerability Count by an additional 12% (base reduction).",
+          cost: 450,
+          effectType: "SEC_VULNERABILITY_REDUCTION",
+          effectValue: -12,
+          category: "Security",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-security-1-level-2"]
+        },
+        {
+          id: 18,
+          upgradeId: "upgrade-security-3",
+          name: "Security Code Reviews",
+          description: "Establishes mandatory security code reviews. Reduces Time to Remediation for Security Issues by 15%.",
+          cost: 550,
+          effectType: "SEC_REMEDIATION_TIME",
+          effectValue: 0.85,
+          category: "Security",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-security-2"]
+        },
+        {
+          id: 19,
+          upgradeId: "upgrade-security-4",
+          name: "Automated Security Patching",
+          description: "Automates security patching processes for faster vulnerability remediation. Further reduces Time to Remediation for Security Issues by an additional 20%.",
+          cost: 750,
+          effectType: "SEC_REMEDIATION_TIME",
+          effectValue: 0.8,
+          category: "Security",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-security-3"]
+        },
+        {
+          id: 20,
+          upgradeId: "upgrade-security-5",
+          name: "Security Awareness Training",
+          description: "Provides security awareness training to development teams. Reduces the probability of Security Incidents by 25%.",
+          cost: 950,
+          effectType: "SEC_INCIDENT_REDUCTION",
+          effectValue: 0.75,
+          category: "Security",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-security-4"]
+        },
+        
+        // Infrastructure Category
+        {
+          id: 21,
+          upgradeId: "upgrade-infrastructure-1",
+          name: "Cloud Resource Optimization I",
+          description: "Optimizes cloud resource utilization through right-sizing and scaling. Reduces Infrastructure Cost by 8%.",
+          cost: 220,
+          effectType: "INFRA_COST_REDUCTION",
+          effectValue: 0.92,
+          category: "Infrastructure",
+          currentLevel: 0,
+          maxLevel: 5,
+          unlocked: true,
+          prerequisites: []
+        },
+        {
+          id: 22,
+          upgradeId: "upgrade-infrastructure-2",
+          name: "Containerization Technology (Docker)",
+          description: "Adopts containerization for improved application portability and resource efficiency. Further reduces Infrastructure Cost by an additional 10%.",
+          cost: 420,
+          effectType: "INFRA_COST_REDUCTION",
+          effectValue: 0.9,
+          category: "Infrastructure",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-infrastructure-1-level-2"]
+        },
+        {
+          id: 23,
+          upgradeId: "upgrade-infrastructure-3",
+          name: "Automated Scaling (Auto-Scaling)",
+          description: "Implements auto-scaling for infrastructure to dynamically adjust resources based on demand. Improves Availability by 0.5% (additive).",
+          cost: 620,
+          effectType: "AVAILABILITY_BOOST",
+          effectValue: 0.5,
+          category: "Infrastructure",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-infrastructure-2"]
+        },
+        {
+          id: 24,
+          upgradeId: "upgrade-infrastructure-4",
+          name: "Serverless Computing Adoption",
+          description: "Adopts serverless computing for event-driven workloads and cost optimization. Reduces Infrastructure Cost by a further 12%.",
+          cost: 780,
+          effectType: "INFRA_COST_REDUCTION",
+          effectValue: 0.88,
+          category: "Infrastructure",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-infrastructure-3"]
+        },
+        {
+          id: 25,
+          upgradeId: "upgrade-infrastructure-5",
+          name: "Geographically Redundant Infrastructure",
+          description: "Deploys geographically redundant infrastructure for disaster recovery and high availability. Improves Availability by an additional 0.75% (additive) and Mean Time Between Failures (MTBF) by 10%.",
+          cost: 1000,
+          effectType: "GEO_REDUNDANCY",
+          effectValue: {availability: 0.75, mtbf: 1.1},
+          category: "Infrastructure",
+          currentLevel: 0,
+          maxLevel: 1,
+          unlocked: false,
+          prerequisites: ["upgrade-infrastructure-4"]
+        }
+      ];
+    }
+    
+    // Generate a new story
+    function generateStory() {
+      const storyId = Date.now() + Math.floor(Math.random() * 1000);
+      const storyTypes = [
+        "Feature Implementation", 
+        "Bug Fix", 
+        "Security Update", 
+        "Performance Optimization", 
+        "UI Enhancement"
+      ];
+      const featureTags = [
+        "Frontend", "Backend", "Database", "Authentication", "API", 
+        "Reporting", "Analytics", "Mobile", "Integration", "Infrastructure"
+      ];
+      
+      const type = storyTypes[Math.floor(Math.random() * storyTypes.length)];
+      const tag = featureTags[Math.floor(Math.random() * featureTags.length)];
+      
+      return {
+        id: storyId,
+        storyID: `STORY-${storyId.toString().substring(7)}`,
+        name: `${type}: ${tag}`,
+        description: `Implement a ${type.toLowerCase()} for the ${tag.toLowerCase()} component`,
+        benefit: getRandomInt(1, 10),
+        penalty: getRandomInt(0, 5),
+        estimate: getRandomInt(1, 8),
+        risk: getRandomInt(0, 5),
+        featureTag: tag,
+        status: "BACKLOG",
+        creationTime: new Date(), // Track when story was created for lead time metrics
+        startTime: null,
+        endTime: null,
+        failureReason: null,
+        wipProgress: 0
+      };
+    }
+    
+    // Generate an incident
+    function generateIncident() {
+      const incidentId = Date.now() + Math.floor(Math.random() * 1000);
+      const incidentTypes = ["Performance", "Security", "Deployment"];
+      const priorities = ["High", "Medium", "Low"];
+      
+      const type = incidentTypes[Math.floor(Math.random() * incidentTypes.length)];
+      const priority = priorities[Math.floor(Math.random() * priorities.length)];
+      let costMultiplier = 1;
+      
+      if (priority === "High") costMultiplier = 3;
+      else if (priority === "Medium") costMultiplier = 2;
+      
+      const remediationCost = getRandomInt(5, 15) * costMultiplier;
+      
+      return {
+        id: incidentId,
+        incidentID: `INC-${incidentId.toString().substring(7)}`,
+        name: `${type} Incident`,
+        description: generateIncidentDescription(type),
+        type: type,
+        priority: priority,
+        status: "Active",
+        startTime: new Date(),
+        endTime: null,
+        impactDescription: generateImpactDescription(type),
+        remediationCost: remediationCost
+      };
+    }
+    
+    // Generate an incident description
+    function generateIncidentDescription(type) {
+      const descriptions = {
+        "Performance": [
+          "System response time has increased beyond acceptable thresholds",
+          "Database queries are taking longer than expected",
+          "Memory usage is at 95% capacity",
+          "CPU utilization spike detected",
+          "Cache hit rate has dropped significantly"
+        ],
+        "Security": [
+          "Unusual login patterns detected",
+          "Potential SQL injection attempt identified",
+          "Security certificate expiration warning",
+          "Firewall rule bypass detected",
+          "Unauthorized access attempt to restricted area"
+        ],
+        "Deployment": [
+          "Latest deployment causing 404 errors",
+          "Configuration mismatch between environments",
+          "Database migration failed during deployment",
+          "Asset compilation error in production build",
+          "Service dependency unavailable after deployment"
+        ]
+      };
+      
+      const typeDescriptions = descriptions[type] || descriptions["Performance"];
+      return typeDescriptions[Math.floor(Math.random() * typeDescriptions.length)];
+    }
+    
+    // Generate an impact description
+    function generateImpactDescription(type) {
+      const impacts = {
+        "Performance": [
+          "Users experiencing slow page loads",
+          "Report generation taking 3x longer than normal",
+          "API response times exceeding SLA",
+          "Background jobs queuing up",
+          "Dashboard data refresh delayed"
+        ],
+        "Security": [
+          "Potential data exposure for up to 100 users",
+          "Admin functions temporarily disabled",
+          "Some API endpoints restricted as precaution",
+          "Password reset required for affected accounts",
+          "External integrations temporarily suspended"
+        ],
+        "Deployment": [
+          "New feature unavailable to 20% of users",
+          "Search functionality returning incomplete results",
+          "Some UI components not rendering correctly",
+          "Mobile app crashes when accessing new features",
+          "Payment processing experiencing intermittent failures"
+        ]
+      };
+      
+      const typeImpacts = impacts[type] || impacts["Performance"];
+      return typeImpacts[Math.floor(Math.random() * typeImpacts.length)];
+    }
+    
+    // Start the game loop
+    function startGameLoop() {
+      // Clear any existing intervals/timeouts
+      if (gameLoopInterval) clearInterval(gameLoopInterval);
+      if (storyGenerationTimeout) clearTimeout(storyGenerationTimeout);
+      if (incidentGenerationTimeout) clearTimeout(incidentGenerationTimeout);
+      
+      // Run game loop every 3 seconds
+      gameLoopInterval = setInterval(gameLoop, 3000);
+      
+      // Schedule new story generation
+      scheduleStoryGeneration();
+      
+      // Schedule random incident generation
+      scheduleIncidentGeneration();
+    }
+    
+    // Main game loop
+    function gameLoop() {
+      try {
+        // Process WIP stories
+        processWIPStories();
+        
+        // Generate passive DevOps points
+        generatePassivePoints();
+        
+        // Apply incidents effect
+        applyIncidentsEffect();
+        
+        // Update CFD data for visualization
+        updateCumulativeFlowData();
+        
+        try {
+          // Auto-move stories to WIP if space available
+          // This is in a separate try/catch to prevent errors in one function from affecting the whole game loop
+          autoMoveStoriesToWIP();
+        } catch (autoMoveError) {
+          console.error('Error in auto-move stories:', autoMoveError);
+          // Continue with game loop even if this function fails
+        }
+        
+        // Update UI
+        updateUI();
+        
+        // Auto-save game every 5 minutes
+        const now = new Date();
+        const lastSave = localStorage.getItem('devops-infinity-last-save');
+        
+        if (!lastSave || (now.getTime() - new Date(lastSave).getTime()) > 5 * 60 * 1000) {
+          localStorage.setItem('devops-infinity-save', JSON.stringify(gameState));
+          localStorage.setItem('devops-infinity-last-save', now.toISOString());
+          console.log('Auto-saved game');
+        }
+      } catch (error) {
+        console.error('Error in game loop:', error);
+        // Try to at least update the UI and save the game even if there's an error
+        try {
+          updateUI();
+        } catch (uiError) {
+          console.error('Failed to update UI after game loop error:', uiError);
+        }
+      }
+    }
+    
+    // Process stories in WIP
+    function processWIPStories() {
+      const wipStories = gameState.stories.wip;
+      
+      for (let i = 0; i < wipStories.length; i++) {
+        const story = wipStories[i];
+        
+        // Update progress
+        let progress = story.wipProgress || 0;
+        
+        // Base progress increment
+        let progressIncrease = getRandomInt(5, 15);
+        
+        // Apply deployment speed upgrades if any
+        const speedUpgrades = gameState.upgrades.filter(u => 
+          u.effectType === 'DEPLOYMENT_SPEEDUP' && u.currentLevel > 0
+        );
+        
+        for (const upgrade of speedUpgrades) {
+          progressIncrease += upgrade.currentLevel * 3; // 3% faster per level
+        }
+        
+        progress += progressIncrease;
+        
+        if (progress >= 100) {
+          // Story is complete, deploy it
+          story.wipProgress = 100;
+          story.status = "DEPLOYED";
+          story.endTime = new Date();
+          
+          // Store original values for animation
+          const oldDP = gameState.metrics.devopsPoints;
+          const oldFreq = gameState.metrics.deploymentFrequency;
+          
+          // Update metrics
+          gameState.metrics.devopsPoints += story.benefit;
+          gameState.metrics.deploymentFrequency += 1;
+          
+          // Show animations for story completion
+          showResourceGain(dpElement, `+${story.benefit}`, 'accent-teal');
+          applyPulseAnimation(dpElement);
+          showResourceGain(deployFreqElement, '+1', 'accent-blue');
+          applyPulseAnimation(deployFreqElement);
+          
+          // Move to deployed list
+          gameState.stories.deployed.push(story);
+          gameState.stories.wip.splice(i, 1);
+          i--; // Adjust index after removal
+          
+          // Update Kanban metrics (lead time and cycle time)
+          updateKanbanMetrics(story);
+          
+          // Show success toast for story completion
+          showToast(`Story "${story.name}" successfully deployed!`, 'success');
+          
+          // Deployment success chance affected by system availability
+          const availabilityFactor = gameState.metrics.availability / 100;
+          const deploymentSuccessChance = 0.8 * availabilityFactor; // 80% at 100% availability
+          
+          // Check if incident occurs
+          if (Math.random() > deploymentSuccessChance) {
+            // Calculate incident reduction from upgrades
+            let incidentReduction = 0;
+            const incidentReductionUpgrades = gameState.upgrades.filter(u => 
+              u.effectType === 'INCIDENT_REDUCTION' && u.currentLevel > 0
+            );
+            
+            for (const upgrade of incidentReductionUpgrades) {
+              incidentReduction += upgrade.currentLevel * 0.05; // 5% reduction per level
+            }
+            
+            // Adjusted chance after upgrades
+            if (Math.random() > incidentReduction) {
+              const incident = generateIncident();
+              incident.name = `Deployment Issue: ${story.name}`;
+              incident.description = `An incident occurred while deploying "${story.name}".`;
+              gameState.incidents.push(incident);
+              
+              // Update failure rate
+              gameState.metrics.changeFailureRate = Math.round(
+                (gameState.metrics.changeFailureRate * (gameState.metrics.deploymentFrequency - 1) + 100) / 
+                gameState.metrics.deploymentFrequency
+              );
+            }
+          }
+        } else {
+          // Update progress
+          story.wipProgress = progress;
+        }
+      }
+    }
+    
+    // Generate passive DevOps Points
+    function generatePassivePoints() {
+      // Base passive generation
+      let passiveIncrease = 1;
+      
+      // Apply upgrades effect if any
+      const dpMultiplierUpgrades = gameState.upgrades.filter(u => 
+        u.effectType === 'DP_MULTIPLIER' && u.currentLevel > 0
+      );
+      
+      for (const upgrade of dpMultiplierUpgrades) {
+        passiveIncrease += upgrade.currentLevel * 0.5; // 50% more per level
+      }
+      
+      // Save the old value to animate the difference
+      const oldValue = gameState.metrics.devopsPoints;
+      
+      // Update the value
+      gameState.metrics.devopsPoints += Math.round(passiveIncrease);
+      gameState.metrics.lastUpdateTime = new Date();
+      
+      // Show animation for the passive gain
+      const pointsGained = Math.round(passiveIncrease);
+      if (pointsGained > 0) {
+        showResourceGain(dpElement, `+${pointsGained}`, 'accent-teal');
+        applyPulseAnimation(dpElement);
+      }
+    }
+    
+    // Show resource gain animation
+    function showResourceGain(element, amount, colorClass) {
+      // Create the floating text element
+      const popup = document.createElement('div');
+      popup.className = `resource-popup text-${colorClass}`;
+      popup.textContent = amount;
+      
+      // Position it near the element
+      const rect = element.getBoundingClientRect();
+      popup.style.left = `${rect.left + rect.width / 2}px`;
+      popup.style.top = `${rect.top}px`;
+      
+      // Add to DOM
+      document.body.appendChild(popup);
+      
+      // Remove after animation completes
+      setTimeout(() => {
+        if (document.body.contains(popup)) {
+          document.body.removeChild(popup);
+        }
+      }, 2000);
+    }
+    
+    // Apply pulse animation to an element
+    function applyPulseAnimation(element) {
+      element.classList.add('pulse-animation');
+      setTimeout(() => {
+        element.classList.remove('pulse-animation');
+      }, 500);
+    }
+    
+    // Apply glow animation to an element
+    function applyGlowAnimation(element) {
+      element.classList.add('glow-animation');
+      setTimeout(() => {
+        element.classList.remove('glow-animation');
+      }, 1000);
+    }
+    
+    // Apply incidents effect on metrics
+    function applyIncidentsEffect() {
+      if (gameState.incidents.length > 0) {
+        // Each incident drops availability slightly
+        const availabilityDrop = gameState.incidents.length * 1; // 1% per incident
+        gameState.metrics.availability = Math.max(70, gameState.metrics.availability - availabilityDrop);
+      } else if (gameState.metrics.availability < 100) {
+        // Gradually recover availability when no incidents
+        gameState.metrics.availability = Math.min(100, gameState.metrics.availability + 0.5);
+      }
+    }
+    
+    // Schedule new story generation
+    function scheduleStoryGeneration() {
+      // Generate a new story every 15-30 seconds
+      const delay = getRandomInt(15000, 30000);
+      storyGenerationTimeout = setTimeout(() => {
+        const newStory = generateStory();
+        gameState.stories.backlog.push(newStory);
+        
+        // Show toast notification for new story
+        showToast(`New story added to backlog: "${newStory.name}"`, 'info');
+        
+        // Apply animation to the backlog count
+        applyPulseAnimation(backlogCountElement);
+        
+        updateUI();
+        scheduleStoryGeneration(); // Schedule next story
+      }, delay);
+    }
+    
+    // Function to manually create a random incident
+    function createRandomIncident() {
+      try {
+        // Generate a new incident
+        const newIncident = generateIncident();
+        
+        // Add a special tag to identify manually created incidents
+        newIncident.manuallyCreated = true;
+        
+        // Set the start time to now
+        newIncident.startTime = new Date();
+        newIncident.status = "Active";
+        
+        // Add the incident to the game state
+        gameState.incidents.push(newIncident);
+        
+        // Show toast notification for new incident
+        showToast(`Created new incident: "${newIncident.name}"!`, 'warning');
+        
+        // Apply animation to availability
+        showResourceGain(availabilityElement, '-1%', 'accent-red');
+        applyPulseAnimation(availabilityElement);
+        
+        // Reduce availability by 1% when an incident occurs
+        gameState.metrics.availability = Math.max(0, gameState.metrics.availability - 1);
+        
+        // Update UI to show the incident
+        updateUI();
+        
+        // Auto-save
+        autoSaveGame();
+      } catch (error) {
+        console.error('Error creating random incident:', error);
+        showToast('Failed to create incident: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
+    
+    // Schedule random incident generation
+    function scheduleIncidentGeneration() {
+      // 10% chance of incident every 20-40 seconds
+      const delay = getRandomInt(20000, 40000);
+      incidentGenerationTimeout = setTimeout(() => {
+        // Calculate incident reduction from upgrades
+        let incidentReduction = 0;
+        const incidentReductionUpgrades = gameState.upgrades.filter(u => 
+          u.effectType === 'INCIDENT_REDUCTION' && u.currentLevel > 0
+        );
+        
+        for (const upgrade of incidentReductionUpgrades) {
+          incidentReduction += upgrade.currentLevel * 0.05; // 5% reduction per level
+        }
+        
+        // Adjusted chance after upgrades
+        const adjustedChance = Math.max(0.01, 0.1 - incidentReduction); // Min 1% chance
+        
+        if (Math.random() < adjustedChance) {
+          const newIncident = generateIncident();
+          gameState.incidents.push(newIncident);
+          
+          // Show toast notification for new incident
+          showToast(`New incident detected: "${newIncident.name}"!`, 'warning');
+          
+          // Apply animation to availability
+          showResourceGain(availabilityElement, '-1%', 'accent-red');
+          applyPulseAnimation(availabilityElement);
+          
+          updateUI();
+        }
+        
+        scheduleIncidentGeneration(); // Schedule next check
+      }, delay);
+    }
+    
+    // Move a story to WIP
+    function moveToWIP(storyId) {
+      try {
+        // Check if storyId is valid
+        if (!storyId) {
+          throw new Error('Invalid story ID');
+        }
+        
+        // Check if this is an incident first
+        const incidentIndex = gameState.incidents.findIndex(i => i.id === storyId);
+        if (incidentIndex !== -1) {
+          // This is an incident, handle differently
+          return remediateIncident(storyId);
+        }
+        
+        // Find story in backlog
+        const storyIndex = gameState.stories.backlog.findIndex(s => s.id === storyId);
+        if (storyIndex === -1) {
+          // Check if the story is already in WIP
+          const isInWip = gameState.stories.wip.some(s => s.id === storyId);
+          if (isInWip) {
+            throw new Error('Story is already in progress');
+          } else {
+            throw new Error('Story not found in backlog');
+          }
+        }
+        
+        // Check if WIP limit is reached (max 3 stories)
+        if (gameState.stories.wip.length >= 3) {
+          throw new Error('WIP limit reached (max 3 stories). Complete some in-progress stories before starting new ones to improve your team\'s focus and delivery speed.');
+        }
+        
+        // Move story from backlog to WIP
+        const story = gameState.stories.backlog[storyIndex];
+        story.status = 'WIP';
+        story.startTime = new Date();
+        story.wipProgress = 0;
+        
+        // Ensure creation time is set for lead time calculation
+        if (!story.creationTime) {
+          story.creationTime = story.startTime; // If created before this feature, use start time as fallback
+          console.log('Setting missing creation time for story:', story.id);
+        }
+        
+        // Copy the story to WIP array and remove from backlog
+        gameState.stories.wip.push({...story});
+        gameState.stories.backlog.splice(storyIndex, 1);
+        
+        // Show toast notification for the started story
+        showToast(`Started working on story: "${story.name}"`, 'success');
+        
+        // Check if we're approaching WIP limit and show warning
+        if (gameState.stories.wip.length === 2) {
+          showToast('You have 2 items in progress. WIP limit is 3.', 'info');
+        } else if (gameState.stories.wip.length === 3) {
+          showToast('You have reached the WIP limit of 3 items.', 'warning');
+        }
+        
+        // Apply animation to the WIP count
+        applyPulseAnimation(wipCountElement);
+        
+        // Update UI
+        updateUI();
+        
+        // Save game after state change
+        autoSaveGame();
+      } catch (error) {
+        console.error('Error moving story to WIP:', error);
+        showToast(`Error: ${error.message}`, 'error');
+      }
+    }
+    
+    // Auto-save game to local storage
+    function autoSaveGame() {
+      try {
+        localStorage.setItem('devops-infinity-save', JSON.stringify(gameState));
+        console.log('Auto-saved game');
+      } catch (error) {
+        console.error('Failed to auto-save game:', error);
+      }
+    }
+    
+    // Purchase an upgrade
+    function purchaseUpgrade(upgradeId) {
+      try {
+        // Find upgrade
+        const upgrade = gameState.upgrades.find(u => u.id === upgradeId);
+        if (!upgrade) {
+          throw new Error('Upgrade not found');
+        }
+        
+        // Check if upgrade is unlocked and not at max level
+        if (!upgrade.unlocked) {
+          throw new Error('Upgrade is not unlocked yet');
+        }
+        
+        if (upgrade.currentLevel >= upgrade.maxLevel) {
+          throw new Error('Upgrade already at max level');
+        }
+        
+        // Check if enough points
+        if (gameState.metrics.devopsPoints < upgrade.cost) {
+          throw new Error('Not enough DevOps points');
+        }
+        
+        // Store original values for animation
+        const oldDP = gameState.metrics.devopsPoints;
+        const oldLevel = upgrade.currentLevel;
+        const cost = upgrade.cost;
+        
+        // Purchase upgrade
+        gameState.metrics.devopsPoints -= upgrade.cost;
+        upgrade.currentLevel += 1;
+        upgrade.cost = Math.round(upgrade.cost * 1.5); // Increase cost for next level
+        
+        // Show animations for upgrade purchase
+        showResourceGain(dpElement, `-${cost}`, 'accent-red');
+        applyPulseAnimation(dpElement);
+        
+        // Apply immediate effects if any
+        applyUpgradeEffect(upgrade);
+        
+        // Show toast notification
+        showToast(`Upgraded: ${upgrade.name} to level ${upgrade.currentLevel}!`, 'success');
+        
+        // Update UI
+        updateUI();
+        
+        // Auto-save game state
+        autoSaveGame();
+        
+        // Update the upgrade in the modal instead of reloading it
+        const upgradesModal = document.getElementById('upgrades-modal-container');
+        if (upgradesModal) {
+          // Update just the specific upgrade card
+          const upgradeCard = document.getElementById(`upgrade-card-${upgradeId}`);
+          if (upgradeCard) {
+            // Update level display
+            const levelElement = upgradeCard.querySelector('.upgrade-level');
+            if (levelElement) {
+              levelElement.textContent = `Level ${upgrade.currentLevel}/${upgrade.maxLevel}`;
+            }
+            
+            // Update cost display
+            const costElement = upgradeCard.querySelector('.upgrade-cost');
+            if (costElement) {
+              costElement.textContent = `${upgrade.cost} DP`;
+            }
+            
+            // Update button state if necessary (disable if max level or not enough DP)
+            const purchaseButton = upgradeCard.querySelector('button');
+            if (purchaseButton) {
+              const canPurchase = gameState.metrics.devopsPoints >= upgrade.cost && upgrade.currentLevel < upgrade.maxLevel;
+              
+              if (upgrade.currentLevel >= upgrade.maxLevel) {
+                purchaseButton.textContent = 'Maxed';
+                purchaseButton.disabled = true;
+                purchaseButton.classList.add('opacity-50', 'cursor-not-allowed');
+                purchaseButton.classList.remove('btn-purple');
+                purchaseButton.classList.add('bg-dark-300', 'text-gray-500');
+              } else {
+                purchaseButton.disabled = !canPurchase;
+                if (!canPurchase) {
+                  purchaseButton.classList.add('opacity-50', 'cursor-not-allowed');
+                  purchaseButton.classList.remove('btn-purple');
+                  purchaseButton.classList.add('bg-dark-300', 'text-gray-500');
+                } else {
+                  purchaseButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                  purchaseButton.classList.add('btn-purple');
+                  purchaseButton.classList.remove('bg-dark-300', 'text-gray-500');
+                }
+              }
+            }
+          }
+          
+          // Update the DevOps Points display in the modal
+          const dpDisplay = upgradesModal.querySelector('#modal-dp-display');
+          if (dpDisplay) {
+            dpDisplay.textContent = gameState.metrics.devopsPoints;
+          }
+        }
+      } catch (error) {
+        console.error('Error purchasing upgrade:', error);
+        showToast(`Error: ${error.message}`, 'error');
+      }
+    }
+    
+    // Apply immediate effects of upgrades
+    function applyUpgradeEffect(upgrade) {
+      switch (upgrade.effectType) {
+        case 'AVAILABILITY_BOOST':
+          // Additive boost to availability
+          const boostAmount = upgrade.effectValue || 5;
+          gameState.metrics.availability = Math.min(100, gameState.metrics.availability + boostAmount);
+          break;
+          
+        case 'TEAM_EFFICIENCY':
+          // Team efficiency multiplier - affects DP generation
+          // This will be applied in the game loop
+          break;
+          
+        case 'WIP_DURATION':
+          // WIP Duration multiplier - affects story completion speed
+          // This will be applied in the processWIPStories function
+          break;
+          
+        case 'RISK_REDUCTION':
+          // Risk reduction for new stories - applied during story generation
+          break;
+          
+        case 'DEPLOYMENT_FREQUENCY':
+          // Increases deployment frequency
+          // This is an additive bonus and will be applied in game metrics
+          break;
+          
+        case 'LEAD_TIME':
+          // Reduces lead time for changes
+          // Applied as a multiplier to WIP duration
+          break;
+          
+        case 'DEPLOYMENT_CD':
+          // Combined effect for continuous deployment
+          // This has multiple effects on different metrics
+          break;
+          
+        case 'INFRA_COST_REDUCTION':
+          // Reduces infrastructure costs
+          // Applied as a multiplier to infrastructure costs
+          break;
+          
+        case 'MTTR_IMPROVEMENT':
+          // Improves Mean Time To Recovery
+          // Applied as a multiplier to incident resolution time
+          break;
+          
+        case 'TEST_COVERAGE':
+          // Increases test coverage
+          // This is an additive bonus applied to test coverage
+          break;
+          
+        case 'ERROR_RATE_REDUCTION':
+          // Reduces error rate
+          // Applied as a multiplier to error rate
+          break;
+          
+        case 'CFR_REDUCTION':
+          // Reduces Change Failure Rate
+          // Applied as a multiplier to CFR
+          break;
+          
+        case 'SEC_VULNERABILITY_REDUCTION':
+          // Reduces security vulnerabilities
+          // Applied as a base reduction to vulnerability count
+          break;
+          
+        case 'SEC_REMEDIATION_TIME':
+          // Reduces time to remediate security issues
+          // Applied as a multiplier to security remediation time
+          break;
+          
+        case 'SEC_INCIDENT_REDUCTION':
+          // Reduces probability of security incidents
+          // Applied as a multiplier to security incident chance
+          break;
+          
+        case 'GEO_REDUNDANCY':
+          // Provides geo-redundancy benefits
+          // This has multiple effects: availability boost and MTBF improvement
+          if (upgrade.effectValue && upgrade.effectValue.availability) {
+            gameState.metrics.availability = Math.min(100, gameState.metrics.availability + upgrade.effectValue.availability);
+          }
+          break;
+          
+        // Other effects are applied implicitly in the game loop
+      }
+    }
+    
+    // Remediate an incident
+    // Track the last time we showed "not enough DP" toast message
+    let lastInsufficientDPToastTime = 0;
+    
+    function remediateIncident(incidentId) {
+      try {
+        // Find incident
+        const incidentIndex = gameState.incidents.findIndex(i => i.id === incidentId);
+        if (incidentIndex === -1) {
+          throw new Error('Incident not found');
+        }
+        
+        const incident = gameState.incidents[incidentIndex];
+        
+        // Check if this incident is already being remediated
+        if (incident.remediationInProgress) {
+          showToast(`Incident "${incident.name}" is already being remediated.`, 'info');
+          return;
+        }
+        
+        // Check if enough points - show rate-limited toast to avoid spam
+        if (gameState.metrics.devopsPoints < incident.remediationCost) {
+          const now = Date.now();
+          // Only show toast once every 5 seconds
+          if (now - lastInsufficientDPToastTime > 5000) {
+            showToast(`Not enough DevOps Points to remediate incident. Need ${incident.remediationCost} DP.`, 'warning');
+            lastInsufficientDPToastTime = now;
+          }
+          return; // Return instead of throwing error
+        }
+        
+        // Store original values for animation
+        const oldDP = gameState.metrics.devopsPoints;
+        
+        // Deduct points immediately
+        gameState.metrics.devopsPoints -= incident.remediationCost;
+        
+        // Show animation for cost
+        showResourceGain(dpElement, `-${incident.remediationCost}`, 'accent-red');
+        applyPulseAnimation(dpElement);
+        
+        // Start remediation process
+        incident.remediationInProgress = true;
+        incident.remediationStartTime = new Date();
+        incident.status = "WIP";
+        
+        // Convert incident to a story-like format for WIP column
+        const incidentStory = convertIncidentToStory(incident);
+        
+        // Remove from incidents list
+        gameState.incidents.splice(incidentIndex, 1);
+        
+        // Add to WIP list
+        gameState.stories.wip.push(incidentStory);
+        
+        // Calculate remediation time based on cost (1 second per 5 points of cost, minimum 3 seconds)
+        const baseDuration = Math.max(3, Math.floor(incident.remediationCost / 5));
+        
+        // Apply MTTR improvement effects from upgrades if available
+        let durationMultiplier = 1.0;
+        
+        // Find upgrades that affect MTTR (Mean Time To Recovery)
+        const mttrUpgrades = gameState.upgrades.filter(
+          u => u.unlocked && u.purchased && u.effectType === 'MTTR_IMPROVEMENT'
+        );
+        
+        // Apply the effects of all active MTTR upgrades
+        mttrUpgrades.forEach(upgrade => {
+          // Most MTTR upgrades provide a multiplier less than 1 to reduce time
+          if (typeof upgrade.effectValue === 'number') {
+            durationMultiplier *= upgrade.effectValue;
+          }
+        });
+        
+        // Calculate final duration in seconds
+        const finalDuration = Math.max(2, Math.round(baseDuration * durationMultiplier));
+        
+        // Set progress to 0
+        incident.remediationProgress = 0;
+        
+        // Show toast about remediation starting
+        showToast(`Started remediation of "${incident.name}" (Est. ${finalDuration}s)`, 'info');
+        
+        // Update UI to show progress
+        updateUI();
+        
+        // Set a regular interval to update progress
+        const updateInterval = setInterval(() => {
+          // Since we've moved the incident to the WIP column, we need to find it there
+          const incidentInWIP = gameState.stories.wip.find(s => s.id === incidentId);
+          
+          if (!incidentInWIP) {
+            clearInterval(updateInterval);
+            return;
+          }
+          
+          // Update progress
+          const elapsedTime = (new Date() - new Date(incidentInWIP.startTime)) / 1000;
+          incidentInWIP.wipProgress = Math.min(100, Math.floor((elapsedTime / finalDuration) * 100));
+          
+          // Update UI to show progress
+          updateUI();
+          
+          // Check if remediation is complete
+          if (incidentInWIP.wipProgress >= 100) {
+            clearInterval(updateInterval);
+            
+            // Complete the remediation - pass a copy of the original incident data
+            completeIncidentRemediation({
+              id: incidentId,
+              name: incidentInWIP.name.replace('🚨 INCIDENT: ', ''),
+              remediationStartTime: incidentInWIP.startTime,
+              status: 'WIP'
+            });
+          }
+        }, 250); // Update 4 times per second
+        
+        // Set a timeout as backup to ensure remediation completes
+        setTimeout(() => {
+          clearInterval(updateInterval);
+          
+          // Since the incident is now in WIP, check there
+          const incidentInWIP = gameState.stories.wip.find(s => s.id === incidentId);
+          if (incidentInWIP && incidentInWIP.wipProgress < 100) {
+            // Force completion
+            completeIncidentRemediation({
+              id: incidentId,
+              name: incidentInWIP.name.replace('🚨 INCIDENT: ', ''),
+              remediationStartTime: incidentInWIP.startTime,
+              status: 'WIP'
+            });
+          }
+        }, (finalDuration * 1000) + 500); // Add 500ms buffer
+        
+        // Auto-save game state
+        autoSaveGame();
+      } catch (error) {
+        console.error('Error remediating incident:', error);
+        showToast(`Error: ${error.message}`, 'error');
+      }
+    }
+    
+    // Helper function to complete incident remediation
+    function completeIncidentRemediation(incident) {
+      // Store original value for animation
+      const oldAvailability = gameState.metrics.availability;
+      
+      // Try to find incident in WIP stories first (we now move them there)
+      let incidentStory = gameState.stories.wip.find(s => s.id === incident.id);
+      let isInWIP = !!incidentStory;
+      
+      // If not found in WIP, look in incidents array (for backwards compatibility)
+      const incidentIndex = !isInWIP ? gameState.incidents.findIndex(i => i.id === incident.id) : -1;
+      if (incidentIndex === -1 && !isInWIP) return;
+      
+      // Mark as resolved
+      incident.status = 'Resolved';
+      incident.endTime = new Date();
+      
+      // Calculate resolution time in seconds
+      const startTime = new Date(incident.remediationStartTime);
+      const endTime = new Date(incident.endTime);
+      const resolutionTimeSeconds = (endTime - startTime) / 1000;
+      
+      if (isInWIP) {
+        // Remove from WIP column
+        const wipIndex = gameState.stories.wip.findIndex(s => s.id === incident.id);
+        if (wipIndex !== -1) {
+          gameState.stories.wip.splice(wipIndex, 1);
+        }
+      } else {
+        // Remove from active incidents (legacy method)
+        gameState.incidents.splice(incidentIndex, 1);
+      }
+      
+      // Restore some availability
+      gameState.metrics.availability = Math.min(100, gameState.metrics.availability + 5);
+      
+      // Show animation for availability improvement
+      showResourceGain(availabilityElement, '+5%', 'accent-teal');
+      applyPulseAnimation(availabilityElement);
+      
+      // Show success toast
+      showToast(`Incident "${incident.name}" resolved in ${resolutionTimeSeconds.toFixed(1)}s!`, 'success');
+      
+      // Update UI
+      updateUI();
+      
+      // Auto-save game state
+      autoSaveGame();
+    }
+    
+    // Calculate story metrics
+    function calculateStoryMetrics(story) {
+      // Base calculation
+      const value = story.benefit + story.penalty; // Higher is better
+      const cost = story.estimate + story.risk;    // Lower is better
+      const priority = value / (cost === 0 ? 1 : cost);
+      
+      // Apply prioritization weights
+      const weightedValue = 
+        (story.benefit * gameState.prioritizationWeights.benefitWeight) + 
+        (story.penalty * gameState.prioritizationWeights.penaltyWeight);
+      
+      const weightedCost = 
+        (story.estimate * gameState.prioritizationWeights.estimateWeight) + 
+        (story.risk * gameState.prioritizationWeights.riskWeight);
+      
+      const weightedPriority = weightedValue / (weightedCost === 0 ? 1 : weightedCost);
+      
+      // Calculate lead time and cycle time for completed stories using game ticks
+      let leadTime = null;
+      let cycleTime = null;
+      
+      if (story.endTime) {
+        // Cycle Time: number of game ticks from "In Progress" (WIP) to "Done" (deployed)
+        // This is strictly measuring the active work time
+        if (story.status === "DEPLOYED") {
+          // Base cycle time on the story's cost (estimate + risk)
+          // This simulates that higher cost/complexity stories take longer to complete
+          cycleTime = cost;
+          
+          // Apply efficiency modifiers from upgrades
+          const teamEfficiency = getTeamEfficiencyMultiplier();
+          if (teamEfficiency < 1.0) {
+            cycleTime = Math.max(Math.round(cycleTime * teamEfficiency), 1);
+          }
+        }
+        
+        // Lead Time: number of game ticks from entering backlog to being deployed
+        // This measures the total time a story spends in the system
+        if (story.status === "DEPLOYED") {
+          // Base lead time calculation includes:
+          // 1. Backlog waiting time
+          // 2. Active work time (cycle time)
+          
+          // Calculate backlog waiting time based on various factors
+          let backlogTime = 2; // Base waiting time
+          
+          // Priority affects waiting time
+          if (story.priority && story.priority > 5) {
+            backlogTime = 1; // High priority items wait less
+          } else if (story.priority && story.priority < 2) {
+            backlogTime = 3; // Low priority items wait more
+          }
+          
+          // Incidents increase waiting time
+          if (gameState.incidents && gameState.incidents.length > 0) {
+            backlogTime += gameState.incidents.length * 0.5;
+          }
+          
+          // Total lead time is backlog waiting time plus cycle time
+          leadTime = backlogTime + cycleTime;
+          
+          // Apply lead time reduction upgrades if present
+          if (hasLeadTimeReductionUpgrade()) {
+            leadTime = Math.max(Math.round(leadTime * 0.9), cycleTime + 1);
+          }
+        }
+      }
+      
+      // Helper function to check if player has purchased lead time reduction upgrades
+      function hasLeadTimeReductionUpgrade() {
+        return gameState.upgrades.some(upgrade => 
+          upgrade.effectType === 'LEAD_TIME' && 
+          upgrade.unlocked && 
+          upgrade.currentLevel > 0
+        );
+      }
+      
+      // Helper function to calculate team efficiency multiplier from upgrades
+      function getTeamEfficiencyMultiplier() {
+        let multiplier = 1.0;
+        
+        // Check for efficiency upgrades
+        const efficiencyUpgrades = gameState.upgrades.filter(upgrade => 
+          upgrade.effectType === 'TEAM_EFFICIENCY' && 
+          upgrade.unlocked && 
+          upgrade.currentLevel > 0
+        );
+        
+        // Apply each upgrade's effect
+        efficiencyUpgrades.forEach(upgrade => {
+          // Most efficiency upgrades provide a multiplier less than 1 to reduce time
+          if (typeof upgrade.effectValue === 'number') {
+            multiplier *= Math.pow(upgrade.effectValue, upgrade.currentLevel);
+          }
+        });
+        
+        return multiplier;
+      }
+      
+      return {
+        ...story,
+        value,
+        cost,
+        priority,
+        weightedPriority,
+        leadTime,
+        cycleTime
+      };
+    }
+    
+    // Convert incident to a story-like object for backlog display
+    function convertIncidentToStory(incident) {
+      return {
+        id: incident.id,
+        storyID: 'INC-' + incident.incidentID,
+        name: '🚨 INCIDENT: ' + incident.name,
+        description: incident.description,
+        benefit: 0,
+        penalty: 10, // High penalty for not fixing
+        estimate: incident.remediationCost / 2, // Cost as effort
+        risk: 0,
+        featureTag: 'INCIDENT',
+        status: 'backlog',
+        startTime: incident.remediationInProgress ? incident.remediationStartTime : null,
+        endTime: null,
+        failureReason: null,
+        wipProgress: incident.remediationProgress || 0,
+        // Special properties for incidents
+        isIncident: true,
+        incidentPriority: incident.priority,
+        remediationCost: incident.remediationCost,
+        remediationInProgress: incident.remediationInProgress || false,
+        // Guaranteed high priority - if in progress, show even higher priority
+        priority: incident.remediationInProgress ? 999 : 99,
+        originalIncidentId: incident.id
+      };
+    }
+    
+    // Update the UI with the current game state
+    // Request additional resources (DevOps Points)
+    function requestResources() {
+      try {
+        // Check if there are resource requests remaining
+        if (!gameState.resourceRequestsRemaining || gameState.resourceRequestsRemaining <= 0) {
+          showToast('No resource requests remaining for this game!', 'error');
+          return;
+        }
+        
+        // Add DevOps Points
+        const pointsToAdd = 250;
+        gameState.metrics.devopsPoints += pointsToAdd;
+        
+        // Decrease remaining requests
+        gameState.resourceRequestsRemaining--;
+        
+        // Update UI
+        updateUI();
+        
+        // Show floating number animation
+        showResourceGain(dpElement, `+${pointsToAdd}`, 'accent-teal');
+        
+        // Show toast
+        showToast(`Received ${pointsToAdd} DevOps Points from management! ${gameState.resourceRequestsRemaining} requests remaining.`, 'success');
+        
+        // Save the game
+        saveGameToLocalStorage();
+      } catch (error) {
+        console.error('Error requesting resources:', error);
+        showToast('Failed to request resources: ' + (error.message || 'Unknown error'), 'error');
+      }
+    }
+    
+    function updateUI() {
+      // Update CFD Chart
+      updateCfdChart();
+      
+      // Update metrics
+      dpElement.textContent = Math.floor(gameState.metrics.devopsPoints);
+      deployFreqElement.textContent = gameState.metrics.deploymentFrequency;
+      availabilityElement.textContent = `${Math.round(gameState.metrics.availability)}%`;
+      failureRateElement.textContent = `${gameState.metrics.changeFailureRate}%`;
+      
+      // Update Kanban metrics if they exist
+      const leadTimeElement = document.getElementById('lead-time');
+      const cycleTimeElement = document.getElementById('cycle-time');
+      
+      // Update overall metrics
+      if (leadTimeElement) {
+        leadTimeElement.textContent = formatTimeMetric(gameState.metrics.averageLeadTime);
+      }
+      
+      if (cycleTimeElement) {
+        cycleTimeElement.textContent = formatTimeMetric(gameState.metrics.averageCycleTime);
+      }
+      
+      // Update story-specific metrics
+      const storyLeadTimeElement = document.getElementById('story-lead-time');
+      const storyCycleTimeElement = document.getElementById('story-cycle-time');
+      
+      if (storyLeadTimeElement) {
+        if (gameState.metrics.storyAverageLeadTime) {
+          storyLeadTimeElement.textContent = formatTimeMetric(gameState.metrics.storyAverageLeadTime);
+        } else {
+          storyLeadTimeElement.textContent = 'N/A';
+        }
+      }
+      
+      if (storyCycleTimeElement) {
+        if (gameState.metrics.storyAverageCycleTime) {
+          storyCycleTimeElement.textContent = formatTimeMetric(gameState.metrics.storyAverageCycleTime);
+        } else {
+          storyCycleTimeElement.textContent = 'N/A';
+        }
+      }
+      
+      // Update incident-specific metrics
+      const incidentLeadTimeElement = document.getElementById('incident-lead-time');
+      const incidentCycleTimeElement = document.getElementById('incident-cycle-time');
+      
+      if (incidentLeadTimeElement) {
+        if (gameState.metrics.incidentAverageLeadTime) {
+          incidentLeadTimeElement.textContent = formatTimeMetric(gameState.metrics.incidentAverageLeadTime);
+        } else {
+          incidentLeadTimeElement.textContent = 'N/A';
+        }
+      }
+      
+      if (incidentCycleTimeElement) {
+        if (gameState.metrics.incidentAverageCycleTime) {
+          incidentCycleTimeElement.textContent = formatTimeMetric(gameState.metrics.incidentAverageCycleTime);
+        } else {
+          incidentCycleTimeElement.textContent = 'N/A';
+        }
+      }
+      
+      // Update resource requests remaining
+      if (resourcesRemainingElement) {
+        resourcesRemainingElement.textContent = gameState.resourceRequestsRemaining || 0;
+        
+        // Disable button if no requests remaining
+        if (requestResourcesButton) {
+          if (!gameState.resourceRequestsRemaining || gameState.resourceRequestsRemaining <= 0) {
+            requestResourcesButton.disabled = true;
+            requestResourcesButton.classList.add('opacity-50', 'cursor-not-allowed');
+          } else {
+            requestResourcesButton.disabled = false;
+            requestResourcesButton.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+        }
+      }
+      
+      // Update progress bars
+      const deployProgress = document.getElementById('deploy-progress');
+      if (deployProgress) {
+        const progressPercent = Math.min(gameState.metrics.deploymentFrequency * 10, 100); // 10% per deployment, max 100%
+        deployProgress.style.width = `${progressPercent}%`;
+      }
+      
+      const availabilityProgress = document.getElementById('availability-progress');
+      if (availabilityProgress) {
+        availabilityProgress.style.width = `${Math.round(gameState.metrics.availability)}%`;
+      }
+      
+      const failureProgress = document.getElementById('failure-progress');
+      if (failureProgress) {
+        failureProgress.style.width = `${gameState.metrics.changeFailureRate}%`;
+      }
+      
+      // Create combined backlog with incidents at the top
+      // Keep incidents in their original order (order of appearance)
+      const incidentStories = gameState.incidents.map(convertIncidentToStory);
+      
+      // Update story counts - include incidents in backlog count
+      backlogCountElement.textContent = `(${incidentStories.length + gameState.stories.backlog.length})`;
+      wipCountElement.textContent = `(${gameState.stories.wip.length}/3)`; // Show the WIP limit
+      deployedCountElement.textContent = `(${gameState.stories.deployed.length})`;
+      
+      // Update specific counts for incidents and stories
+      incidentsCountElement.textContent = `${incidentStories.length}`;
+      storiesCountElement.textContent = `${gameState.stories.backlog.length}`;
+      
+      // Create a data structure that separates incidents from stories but preserves order
+      const separatedBacklog = {
+        incidents: incidentStories,
+        stories: gameState.stories.backlog
+      };
+      
+      // Update story lists - pass the separated backlog for special handling
+      updateStoryList(backlogStoriesElement, separatedBacklog, 'backlog', true);
+      updateStoryList(wipStoriesElement, gameState.stories.wip, 'wip', false);
+      updateStoryList(deployedStoriesElement, gameState.stories.deployed, 'deployed', false);
+      
+      // Hide incidents section since incidents are now in backlog
+      const incidentsSection = document.querySelector('.dashboard-card:has(#incidents-list)');
+      if (incidentsSection) {
+        incidentsSection.style.display = 'none';
+      }
+      
+      // Update upgrades
+      updateUpgradesList();
+    }
+    
+    // Update the story list in the UI
+    function updateStoryList(element, stories, type, showMoveButton) {
+      let displayStories = [];
+      
+      // Special handling for the backlog which now has separate incidents and stories
+      if (type === 'backlog') {
+        // Check if we're using the separated structure
+        if (stories.incidents && stories.stories) {
+          // Clear existing content
+          element.innerHTML = '';
+          
+          if (stories.incidents.length === 0 && stories.stories.length === 0) {
+            element.innerHTML = `<p class="text-gray-400 text-sm text-center my-8">No items in backlog</p>`;
+            return;
+          }
+          
+          // Keep incidents in their original order (order of appearance)
+          let incidentStories = [...stories.incidents];
+          
+          // Sort regular stories by priority
+          let regularStories = [...stories.stories]
+            .map(story => calculateStoryMetrics(story))
+            .sort((a, b) => {
+              const aPriority = a.weightedPriority || a.priority || 0;
+              const bPriority = b.weightedPriority || b.priority || 0;
+              return bPriority - aPriority; // Sort by highest priority first
+            });
+          
+          // Combine with incidents first, then sorted stories
+          displayStories = [...incidentStories, ...regularStories];
+          
+          // Limit to 8 items for display
+          displayStories = displayStories.slice(0, 8);
+        } else {
+          // Fallback for older structure (array instead of separated object)
+          if (!Array.isArray(stories) || stories.length === 0) {
+            element.innerHTML = `<p class="text-gray-400 text-sm text-center my-8">No items in backlog</p>`;
+            return;
+          }
+          
+          element.innerHTML = '';
+          
+          // Sort by priority
+          displayStories = [...stories]
+            .map(story => calculateStoryMetrics(story))
+            .sort((a, b) => {
+              const aPriority = a.weightedPriority || a.priority || 0;
+              const bPriority = b.weightedPriority || b.priority || 0;
+              return bPriority - aPriority; // High to low
+            })
+            .slice(0, 8);
+        }
+      } else {
+        // For WIP and deployed, use the existing handling
+        if (!Array.isArray(stories) || stories.length === 0) {
+          element.innerHTML = `<p class="text-gray-400 text-sm text-center my-8">No items in ${type}</p>`;
+          return;
+        }
+        
+        element.innerHTML = '';
+        displayStories = [...stories];
+        
+        if (type === 'deployed') {
+          // Sort deployed stories by endTime (newest first)
+          displayStories.sort((a, b) => {
+            const aTime = a.endTime ? new Date(a.endTime).getTime() : 0;
+            const bTime = b.endTime ? new Date(b.endTime).getTime() : 0;
+            return bTime - aTime; // Newest to oldest
+          });
+        }
+        
+        // Limit to 8 items for display
+        displayStories = displayStories.slice(0, 8);
+      }
+      
+      displayStories.forEach(story => {
+        // Calculate metrics for prioritization
+        const storyWithMetrics = calculateStoryMetrics(story);
+        
+        const storyElement = document.createElement('div');
+        storyElement.className = `story ${type}`;
+        
+        // Add ID to story for possible drag-drop implementation later
+        storyElement.setAttribute('data-story-id', story.id);
+        
+        // Story header with ID badge
+        let storyContent = `
+          <div class="flex justify-between items-start mb-2">
+            <div class="font-semibold text-white">${story.name}</div>
+            <span class="bg-dark-500 text-xs px-1.5 py-0.5 rounded text-gray-400">${story.storyID}</span>
+          </div>
+          <div class="text-xs text-gray-400 mb-2">${story.description}</div>
+        `;
+        
+        // Calculate and display priority for all stories
+        const priority = storyWithMetrics.weightedPriority || storyWithMetrics.priority || 0;
+        let priorityClass = 'bg-gray-500';
+        if (priority > 7) priorityClass = 'bg-accent-red';
+        else if (priority > 4) priorityClass = 'bg-accent-orange';
+        else if (priority > 2) priorityClass = 'bg-accent-teal';
+        
+        // Show metrics consistently across all columns
+        storyContent += `
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center">
+              <div class="${priorityClass} w-2 h-2 rounded-full mr-1.5"></div>
+              <span class="text-xs">Priority: ${priority.toFixed(1)}</span>
+            </div>
+            <div class="text-xs text-accent-purple font-medium">DP Cost: ${storyWithMetrics.cost}</div>
+          </div>
+          
+          <div class="flex space-x-2 mb-2 text-xs">
+            <div class="bg-dark-600 px-2 py-1 rounded flex-1 text-center">
+              <span class="font-medium">Value: </span><span class="text-accent-teal">${storyWithMetrics.value}</span>
+            </div>
+            <div class="bg-dark-600 px-2 py-1 rounded flex-1 text-center">
+              <span class="font-medium">Cost: </span><span class="text-accent-orange">${storyWithMetrics.cost}</span>
+            </div>
+          </div>
+          
+          <div class="text-xs grid grid-cols-4 gap-1 bg-dark-500 p-1.5 rounded">
+            <div class="flex flex-col">
+              <span class="text-accent-teal text-opacity-80">Benefit</span>
+              <span class="font-medium">${story.benefit}</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-accent-red text-opacity-80">Penalty</span>
+              <span class="font-medium">${story.penalty}</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-accent-blue text-opacity-80">Estimate</span>
+              <span class="font-medium">${story.estimate}</span>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-accent-orange text-opacity-80">Risk</span>
+              <span class="font-medium">${story.risk}</span>
+            </div>
+          </div>`;
+        
+        if (type === 'backlog') {
+          // For incidents in the backlog that are being remediated, show progress bar instead of button
+          if (story.isIncident && story.remediationInProgress) {
+            storyContent += `
+              <div class="mt-3">
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-accent-red font-medium">Remediating...</span>
+                  <span class="text-accent-orange">${story.wipProgress || 0}%</span>
+                </div>
+                <div class="bg-dark-300 h-2 rounded-full w-full overflow-hidden relative">
+                  <div class="bg-accent-red absolute top-0 left-0 h-full rounded-full" style="width: ${story.wipProgress || 0}%"></div>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">
+                  Started: ${story.startTime ? new Date(story.startTime).toLocaleTimeString() : 'N/A'}
+                </div>
+              </div>
+            `;
+          } else if (showMoveButton) {
+            storyContent += `
+              <button class="mt-3 btn ${story.isIncident ? 'btn-red' : 'btn-blue'} w-full flex items-center justify-center" 
+                      onclick="moveToWIP(${story.id})">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                ${story.isIncident ? 'Remediate' : 'Start Work'}
+              </button>
+            `;
+          }
+        } else if (type === 'wip') {
+          storyContent += `
+            <div class="mt-3 flex items-center justify-between text-xs mb-1">
+              <span>Progress:</span>
+              <span class="text-accent-orange">${story.wipProgress || 0}%</span>
+            </div>
+            <div class="bg-dark-300 h-2 rounded-full w-full overflow-hidden relative">
+              <div class="bg-accent-orange absolute top-0 left-0 h-full rounded-full" style="width: ${story.wipProgress || 0}%"></div>
+            </div>
+            <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div class="text-gray-400">
+                Started: <span class="text-white">${story.startTime ? new Date(story.startTime).toLocaleTimeString() : 'N/A'}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-accent-purple">Invested DP: ${storyWithMetrics.cost}</span>
+              </div>
+            </div>
+          `;
+        } else if (type === 'deployed') {
+          // For deployed stories
+          storyContent += `
+            <div class="flex items-center text-accent-teal mt-2 mb-1">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span class="text-xs font-medium">Successfully Deployed</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="text-gray-400">
+                Completed: <span class="text-white">${story.endTime ? new Date(story.endTime).toLocaleTimeString() : 'N/A'}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-accent-teal">Earned DP: +${storyWithMetrics.value}</span>
+              </div>
+            </div>
+            <div class="mt-2 bg-dark-500 p-1.5 rounded text-xs text-center text-accent-purple">
+              Deployment time: ${story.startTime && story.endTime ? Math.round((new Date(story.endTime) - new Date(story.startTime)) / 1000 / 60) + ' minutes' : 'N/A'}
+            </div>
+            
+            <!-- Kanban Metrics for the individual story -->
+            <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-dark-600 px-2 py-1 rounded flex flex-col">
+                <span class="text-gray-400">Lead Time:</span>
+                <span class="font-medium text-accent-purple">${formatTimeMetric(storyWithMetrics.leadTime)}</span>
+              </div>
+              <div class="bg-dark-600 px-2 py-1 rounded flex flex-col">
+                <span class="text-gray-400">Cycle Time:</span>
+                <span class="font-medium text-accent-blue">${formatTimeMetric(storyWithMetrics.cycleTime)}</span>
+              </div>
+            </div>
+          `;
+        }
+        
+        storyElement.innerHTML = storyContent;
+        element.appendChild(storyElement);
+      });
+      
+      if (stories.length > 8) {
+        const moreElement = document.createElement('div');
+        moreElement.className = 'text-center text-gray-400 text-xs mt-3 py-2 bg-dark-500 rounded';
+        moreElement.textContent = `+${stories.length - 8} more stories`;
+        element.appendChild(moreElement);
+      }
+    }
+    
+    // Update the incidents list in the UI
+    function updateIncidentsList() {
+      if (gameState.incidents.length === 0) {
+        incidentsListElement.innerHTML = `<p class="text-gray-400">No active incidents</p>`;
+        return;
+      }
+      
+      incidentsListElement.innerHTML = '';
+      
+      gameState.incidents.forEach(incident => {
+        const incidentElement = document.createElement('div');
+        incidentElement.className = 'incident';
+        
+        let priorityColor = '';
+        switch(incident.priority) {
+          case 'High':
+            priorityColor = 'text-accent-red';
+            break;
+          case 'Medium':
+            priorityColor = 'text-accent-orange';
+            break;
+          case 'Low':
+            priorityColor = 'text-accent-teal';
+            break;
+        }
+        
+        // Check if this incident is being remediated
+        const isRemediating = incident.remediationInProgress === true;
+        
+        // Base HTML for incident
+        let incidentHTML = `
+          <div class="font-medium text-white">${incident.name}</div>
+          <div class="text-sm text-gray-300">${incident.description}</div>
+        `;
+        
+        // Add remediation progress or remediation button
+        if (isRemediating) {
+          // Show progress bar for incident being remediated
+          incidentHTML += `
+            <div class="mt-3">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span>Remediating...</span>
+                <span class="text-accent-orange">${incident.remediationProgress || 0}%</span>
+              </div>
+              <div class="bg-dark-300 h-2 rounded-full w-full overflow-hidden relative">
+                <div class="bg-accent-red absolute top-0 left-0 h-full rounded-full" style="width: ${incident.remediationProgress || 0}%"></div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center mt-2">
+              <div class="text-xs">
+                <span class="font-medium ${priorityColor}">${incident.priority}</span> | 
+                <span class="font-medium">Cost:</span> ${incident.remediationCost} DP
+              </div>
+              <div class="text-xs text-gray-400 italic">In progress...</div>
+            </div>
+          `;
+        } else {
+          // Show remediation button for incidents not being remediated
+          incidentHTML += `
+            <div class="flex justify-between items-center mt-2">
+              <div class="text-xs">
+                <span class="font-medium ${priorityColor}">${incident.priority}</span> | 
+                <span class="font-medium">Cost:</span> ${incident.remediationCost} DP
+              </div>
+              <button class="btn btn-red" 
+                      onclick="remediateIncident(${incident.id})">
+                Remediate
+              </button>
+            </div>
+          `;
+        }
+        
+        incidentElement.innerHTML = incidentHTML;
+        incidentsListElement.appendChild(incidentElement);
+      });
+    }
+    
+    // Update the upgrades list in the UI
+    function updateUpgradesList() {
+      // This function is kept for API compatibility
+      // The upgradesListElement no longer exists in the DOM since we moved the upgrades to a modal
+      // All upgrade rendering is now done in the showUpgradesDetailView function
+      return;
+    }
+    
+    // Show loading state
+    function showLoading() {
+      loadingElement.classList.remove('hidden');
+    }
+    
+    // Hide loading state
+    function hideLoading() {
+      loadingElement.classList.add('hidden');
+    }
+    
+    // Show error state
+    function showError(message) {
+      errorMessageElement.textContent = message;
+      errorElement.classList.remove('hidden');
+      gameContentElement.classList.add('hidden');
+    }
+    
+    // Show game content
+    function showGameContent() {
+      errorElement.classList.add('hidden');
+      gameContentElement.classList.remove('hidden');
+    }
+    
+    // Update the last updated time
+    function updateLastUpdated() {
+      const now = new Date();
+      lastUpdatedElement.textContent = now.toLocaleTimeString();
+    }
+    
+    // Helper function to get random integer
+    function getRandomInt(min, max) {
+      min = Math.ceil(min);
+      max = Math.floor(max);
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    
+    // Format time metrics (in game ticks) to a human-readable string
+    function formatTimeMetric(ticks) {
+      if (ticks === null || ticks === undefined || isNaN(ticks)) {
+        return 'N/A';
+      }
+      
+      // Round to 1 decimal place
+      const roundedTicks = Math.round(ticks * 10) / 10;
+      
+      // Singular or plural form
+      return `${roundedTicks.toFixed(1)} tick${roundedTicks !== 1 ? 's' : ''}`;
+    }
+    
+    // Update Kanban metrics when a story is deployed
+    function updateKanbanMetrics(story) {
+      // Only calculate for stories that have been deployed
+      if (!story || !story.status || story.status !== "DEPLOYED") {
+        return;
+      }
+      
+      // Get the cost (estimate + risk) of the story for base calculation
+      const cost = story.estimate + story.risk;
+      
+      // CYCLE TIME: Measure time from when work starts (entering WIP) to completion (deployment)
+      // Use the story's cost as a base for cycle time in game ticks
+      let cycleTime = cost;
+      
+      // Apply team efficiency modifiers if present
+      const teamEfficiency = getTeamEfficiencyMultiplier();
+      if (teamEfficiency < 1.0) {
+        cycleTime = Math.max(Math.round(cycleTime * teamEfficiency), 1);
+      }
+      
+      // LEAD TIME: Measure total time from creation to completion
+      // Calculate backlog waiting time
+      let backlogTime = 2; // Base backlog waiting time
+      
+      // Adjust backlog time based on priority
+      if (story.priority && story.priority > 5) {
+        backlogTime = 1; // High priority items wait less
+      } else if (story.priority && story.priority < 2) {
+        backlogTime = 3; // Low priority items wait longer
+      }
+      
+      // Total lead time = backlog waiting time + cycle time
+      let leadTime = backlogTime + cycleTime;
+      
+      // Apply lead time reduction upgrades if present
+      if (hasLeadTimeReductionUpgrade()) {
+        leadTime = Math.max(Math.round(leadTime * 0.9), cycleTime + 1);
+      }
+      
+      // Store metrics on the story object
+      story.cycleTime = cycleTime;
+      story.leadTime = leadTime;
+      
+      // Initialize metrics counters if needed
+      if (!gameState.metrics.cycleTimeSum) gameState.metrics.cycleTimeSum = 0;
+      if (!gameState.metrics.leadTimeSum) gameState.metrics.leadTimeSum = 0;
+      if (!gameState.metrics.cycleTimeSampleCount) gameState.metrics.cycleTimeSampleCount = 0;
+      if (!gameState.metrics.leadTimeSampleCount) gameState.metrics.leadTimeSampleCount = 0;
+      
+      // Initialize story-specific metrics if needed
+      if (!gameState.metrics.storyCycleTimeSum) gameState.metrics.storyCycleTimeSum = 0;
+      if (!gameState.metrics.storyLeadTimeSum) gameState.metrics.storyLeadTimeSum = 0;
+      if (!gameState.metrics.storyCycleTimeSampleCount) gameState.metrics.storyCycleTimeSampleCount = 0;
+      if (!gameState.metrics.storyLeadTimeSampleCount) gameState.metrics.storyLeadTimeSampleCount = 0;
+      
+      // Initialize incident-specific metrics if needed
+      if (!gameState.metrics.incidentCycleTimeSum) gameState.metrics.incidentCycleTimeSum = 0;
+      if (!gameState.metrics.incidentLeadTimeSum) gameState.metrics.incidentLeadTimeSum = 0;
+      if (!gameState.metrics.incidentCycleTimeSampleCount) gameState.metrics.incidentCycleTimeSampleCount = 0;
+      if (!gameState.metrics.incidentLeadTimeSampleCount) gameState.metrics.incidentLeadTimeSampleCount = 0;
+      
+      // Determine if this is an incident or a regular story based on the storyID prefix
+      const isIncident = story.storyID && story.storyID.startsWith('INC-');
+      
+      // Update global metrics by adding this story's values
+      gameState.metrics.cycleTimeSum += cycleTime;
+      gameState.metrics.cycleTimeSampleCount += 1;
+      gameState.metrics.averageCycleTime = gameState.metrics.cycleTimeSum / gameState.metrics.cycleTimeSampleCount;
+      
+      gameState.metrics.leadTimeSum += leadTime;
+      gameState.metrics.leadTimeSampleCount += 1;
+      gameState.metrics.averageLeadTime = gameState.metrics.leadTimeSum / gameState.metrics.leadTimeSampleCount;
+      
+      // Update specific metrics based on type (incident or story)
+      if (isIncident) {
+        // Update incident-specific metrics
+        gameState.metrics.incidentCycleTimeSum += cycleTime;
+        gameState.metrics.incidentCycleTimeSampleCount += 1;
+        gameState.metrics.incidentAverageCycleTime = 
+          gameState.metrics.incidentCycleTimeSum / gameState.metrics.incidentCycleTimeSampleCount;
+        
+        gameState.metrics.incidentLeadTimeSum += leadTime;
+        gameState.metrics.incidentLeadTimeSampleCount += 1;
+        gameState.metrics.incidentAverageLeadTime = 
+          gameState.metrics.incidentLeadTimeSum / gameState.metrics.incidentLeadTimeSampleCount;
+      } else {
+        // Update story-specific metrics
+        gameState.metrics.storyCycleTimeSum += cycleTime;
+        gameState.metrics.storyCycleTimeSampleCount += 1;
+        gameState.metrics.storyAverageCycleTime = 
+          gameState.metrics.storyCycleTimeSum / gameState.metrics.storyCycleTimeSampleCount;
+        
+        gameState.metrics.storyLeadTimeSum += leadTime;
+        gameState.metrics.storyLeadTimeSampleCount += 1;
+        gameState.metrics.storyAverageLeadTime = 
+          gameState.metrics.storyLeadTimeSum / gameState.metrics.storyLeadTimeSampleCount;
+      }
+      
+      // Update cumulative flow data
+      updateCumulativeFlowData();
+      
+      // Log for debugging
+      console.log(`Updated Kanban metrics: Lead Time = ${formatTimeMetric(gameState.metrics.averageLeadTime)}, Cycle Time = ${formatTimeMetric(gameState.metrics.averageCycleTime)}`);
+      console.log(`Story metrics: Lead Time = ${formatTimeMetric(leadTime)}, Cycle Time = ${formatTimeMetric(cycleTime)}`);
+      console.log(`Story detail:`, {
+        id: story.id,
+        storyID: story.storyID,
+        cost: cost,
+        leadTime: story.leadTime,
+        cycleTime: story.cycleTime
+      });
+      
+      // Helper function to check if player has purchased lead time reduction upgrades
+      function hasLeadTimeReductionUpgrade() {
+        return gameState.upgrades.some(upgrade => 
+          upgrade.effectType === 'LEAD_TIME' && 
+          upgrade.unlocked && 
+          upgrade.currentLevel > 0
+        );
+      }
+      
+      // Helper function to calculate team efficiency multiplier from upgrades
+      function getTeamEfficiencyMultiplier() {
+        let multiplier = 1.0;
+        
+        // Check for efficiency upgrades
+        const efficiencyUpgrades = gameState.upgrades.filter(upgrade => 
+          upgrade.effectType === 'TEAM_EFFICIENCY' && 
+          upgrade.unlocked && 
+          upgrade.currentLevel > 0
+        );
+        
+        // Apply each upgrade's effect
+        efficiencyUpgrades.forEach(upgrade => {
+          if (typeof upgrade.effectValue === 'number') {
+            multiplier *= Math.pow(upgrade.effectValue, upgrade.currentLevel);
+          }
+        });
+        
+        return multiplier;
+      }
+    }
+    
+    // Update cumulative flow data for CFD visualization
+    // Throttle variables for data collection to prevent too many data points
+    let lastCfdDataUpdate = 0;
+    const CFD_DATA_THROTTLE = 5000; // Collect data at most every 5 seconds
+    
+    function updateCumulativeFlowData() {
+      const now = new Date();
+      const currentTime = now.getTime();
+      
+      // Throttle data collection to prevent too many data points
+      if (currentTime - lastCfdDataUpdate < CFD_DATA_THROTTLE) {
+        // Still update the chart with existing data
+        updateCfdChart();
+        return;
+      }
+      
+      // Calculate the total work items at the beginning of this tick
+      const totalWork = gameState.stories.backlog.length + gameState.stories.wip.length + gameState.stories.deployed.length;
+      
+      // Update CFD data with cumulative values
+      gameState.metrics.cfdData.push({
+        date: currentTime,
+        backlog: totalWork, // Total of all work
+        wip: gameState.stories.wip.length + gameState.stories.deployed.length, // WIP + Deployed
+        deployed: gameState.stories.deployed.length, // Just Deployed
+        total: totalWork
+      });
+      
+      // Keep only the last 30 data points to show a sliding window of recent activity
+      if (gameState.metrics.cfdData.length > 30) {
+        gameState.metrics.cfdData.shift();
+      }
+      
+      // Update timestamps
+      gameState.metrics.lastCfdUpdate = now;
+      lastCfdDataUpdate = currentTime;
+      
+      // Update the CFD chart
+      updateCfdChart();
+    }
+    
+    // Setup sidebar navigation
+    function setupNavigation() {
+      // Add click handlers for each navigation item individually
+      const navDashboard = document.getElementById('nav-dashboard');
+      const navStories = document.getElementById('nav-stories');
+      const navUpgrades = document.getElementById('nav-upgrades');
+      const navSettings = document.getElementById('nav-settings');
+      const navHelp = document.getElementById('nav-help');
+      
+      const allNavItems = [navDashboard, navStories, navUpgrades, navSettings, navHelp];
+      
+      // Helper function to handle click
+      const handleNavClick = (clickedItem) => {
+        if (!clickedItem) return;
+        
+        // Remove active class from all nav items
+        allNavItems.forEach(item => {
+          if (item) item.classList.remove('active');
+        });
+        
+        // Add active class to clicked item
+        clickedItem.classList.add('active');
+        
+        // Handle the appropriate navigation action
+        handleNavigation(clickedItem.id);
+      };
+      
+      // Add click listeners
+      if (navDashboard) {
+        navDashboard.addEventListener('click', () => handleNavClick(navDashboard));
+      }
+      
+      if (navStories) {
+        navStories.addEventListener('click', () => handleNavClick(navStories));
+      }
+      
+      if (navUpgrades) {
+        navUpgrades.addEventListener('click', () => handleNavClick(navUpgrades));
+      }
+      
+      if (navSettings) {
+        navSettings.addEventListener('click', () => handleNavClick(navSettings));
+      }
+      
+      if (navHelp) {
+        navHelp.addEventListener('click', () => handleNavClick(navHelp));
+      }
+    }
+    
+    // Handle navigation changes
+    function handleNavigation(navId) {
+      switch(navId) {
+        case 'nav-dashboard':
+          showToast('Dashboard view active');
+          break;
+        case 'nav-stories':
+          showToast('Stories view - Work in progress! Check back soon.');
+          break;
+        case 'nav-upgrades':
+          showToast('Upgrades view - Work in progress! Check back soon.');
+          break;
+        case 'nav-settings':
+          showPrioritizationSettingsDialog();
+          break;
+        case 'nav-help':
+          showHelpDialog();
+          break;
+      }
+    }
+    
+    // Auto-move stories to WIP based on priority if space is available
+    function autoMoveStoriesToWIP() {
+      try {
+        // Check if we have space in WIP
+        const wipSpaceAvailable = 3 - gameState.stories.wip.length;
+        
+        if (wipSpaceAvailable <= 0) {
+          return; // No space available
+        }
+        
+        // First, prioritize handling any active incidents
+        if (gameState.incidents && gameState.incidents.length > 0) {
+          // Handle incidents first - always take priority
+          const incidentsToHandle = Math.min(wipSpaceAvailable, gameState.incidents.length);
+          
+          // Safely remediate incidents
+          for (let i = 0; i < incidentsToHandle; i++) {
+            if (gameState.incidents[i] && gameState.incidents[i].id) {
+              try {
+                remediateIncident(gameState.incidents[i].id);
+              } catch (remediateError) {
+                console.error("Error remediating incident during auto-move:", remediateError);
+                // Continue with the next incident even if one fails
+              }
+            }
+          }
+          
+          // If there are still incidents left, don't process any regular stories
+          // This ensures all incidents are resolved before working on stories
+          if (gameState.incidents.length > 0) {
+            return;
+          }
+          
+          // Check if we still have space after handling incidents
+          const remainingSpace = 3 - gameState.stories.wip.length;
+          if (remainingSpace <= 0 || gameState.stories.backlog.length === 0) {
+            return;
+          }
+        } else if (gameState.stories.backlog.length === 0) {
+          return; // No incidents or stories to move
+        }
+        
+        // Create a weighted/sorted copy of backlog stories 
+        const sortedBacklogStories = gameState.stories.backlog
+          .map(story => calculateStoryMetrics(story))
+          .sort((a, b) => {
+            const aPriority = a.weightedPriority || a.priority || 0;
+            const bPriority = b.weightedPriority || b.priority || 0;
+            return bPriority - aPriority; // Sort by highest priority first
+          });
+        
+        // Calculate remaining space after handling incidents
+        const remainingSpace = 3 - gameState.stories.wip.length;
+        
+        // Move the highest priority stories to WIP (up to available space)
+        const storiesToMove = Math.min(remainingSpace, sortedBacklogStories.length);
+        
+        // Safely move stories
+        for (let i = 0; i < storiesToMove; i++) {
+          if (sortedBacklogStories[i] && sortedBacklogStories[i].id) {
+            try {
+              moveToWIP(sortedBacklogStories[i].id);
+            } catch (moveError) {
+              console.error("Error moving story to WIP during auto-move:", moveError);
+              // Continue with the next story even if one fails
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error in autoMoveStoriesToWIP:", error);
+        // Error is caught here and will be logged but not thrown further
+        // This prevents the entire game loop from failing
+      }
+    }
+    
+    // Show prioritization settings dialog
+    function showPrioritizationSettingsDialog() {
+      // If there's already a modal/dialog open, remove it first
+      const existingModal = document.getElementById('modal-container');
+      if (existingModal) {
+        document.body.removeChild(existingModal);
+      }
+      
+      // Create modal container
+      const modalContainer = document.createElement('div');
+      modalContainer.id = 'modal-container';
+      modalContainer.className = 'fixed inset-0 bg-dark-900 bg-opacity-75 flex items-center justify-center z-50';
+      
+      // Create the weights and current values
+      const weights = gameState.prioritizationWeights;
+      
+      const modalContent = `
+        <div class="bg-dark-400 rounded-lg p-6 max-w-2xl w-full shadow-xl">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-white">Backlog Prioritization Settings</h2>
+            <button id="close-prioritization-dialog" class="text-gray-400 hover:text-white">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <div class="text-gray-300 mb-6">
+            <p>Adjust the weights of different factors to customize how stories are prioritized in the backlog.</p>
+            <p class="mt-2">Higher weights increase the importance of that factor in prioritization calculations.</p>
+          </div>
+          
+          <div class="mb-8 p-4 bg-dark-500 rounded-lg">
+            <h3 class="text-md font-semibold mb-4 text-white">Current Formula:</h3>
+            <div class="bg-dark-600 p-3 rounded text-sm overflow-x-auto">
+              <code>Priority = (${weights.benefitWeight.toFixed(1)} × Benefit + ${weights.penaltyWeight.toFixed(1)} × Penalty) / (${weights.estimateWeight.toFixed(1)} × Estimate + ${weights.riskWeight.toFixed(1)} × Risk)</code>
+            </div>
+          </div>
+          
+          <div class="space-y-6">
+            <div>
+              <div class="flex justify-between mb-2">
+                <label class="text-white font-medium">Benefit Weight: <span id="benefit-weight-value">${weights.benefitWeight.toFixed(1)}</span></label>
+                <span class="text-accent-teal font-medium">Value Factor</span>
+              </div>
+              <input type="range" id="benefit-weight" class="w-full accent-accent-teal" min="0.5" max="3" step="0.1" value="${weights.benefitWeight}">
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0.5</span>
+                <span>1.5</span>
+                <span>3.0</span>
+              </div>
+            </div>
+            
+            <div>
+              <div class="flex justify-between mb-2">
+                <label class="text-white font-medium">Penalty Weight: <span id="penalty-weight-value">${weights.penaltyWeight.toFixed(1)}</span></label>
+                <span class="text-accent-teal font-medium">Value Factor</span>
+              </div>
+              <input type="range" id="penalty-weight" class="w-full accent-accent-teal" min="0.5" max="3" step="0.1" value="${weights.penaltyWeight}">
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0.5</span>
+                <span>1.5</span>
+                <span>3.0</span>
+              </div>
+            </div>
+            
+            <div>
+              <div class="flex justify-between mb-2">
+                <label class="text-white font-medium">Estimate Weight: <span id="estimate-weight-value">${weights.estimateWeight.toFixed(1)}</span></label>
+                <span class="text-accent-orange font-medium">Cost Factor</span>
+              </div>
+              <input type="range" id="estimate-weight" class="w-full accent-accent-orange" min="0.5" max="3" step="0.1" value="${weights.estimateWeight}">
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0.5</span>
+                <span>1.5</span>
+                <span>3.0</span>
+              </div>
+            </div>
+            
+            <div>
+              <div class="flex justify-between mb-2">
+                <label class="text-white font-medium">Risk Weight: <span id="risk-weight-value">${weights.riskWeight.toFixed(1)}</span></label>
+                <span class="text-accent-orange font-medium">Cost Factor</span>
+              </div>
+              <input type="range" id="risk-weight" class="w-full accent-accent-orange" min="0.5" max="3" step="0.1" value="${weights.riskWeight}">
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0.5</span>
+                <span>1.5</span>
+                <span>3.0</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-8 pt-4 border-t border-dark-300 flex justify-between">
+            <button id="reset-weights" class="btn btn-gray">Reset to Default</button>
+            <button id="save-weights" class="btn btn-blue">Save Changes</button>
+          </div>
+        </div>
+      `;
+      
+      modalContainer.innerHTML = modalContent;
+      document.body.appendChild(modalContainer);
+      
+      // Add event listeners to the sliders
+      const benefitWeightInput = document.getElementById('benefit-weight');
+      const penaltyWeightInput = document.getElementById('penalty-weight');
+      const estimateWeightInput = document.getElementById('estimate-weight');
+      const riskWeightInput = document.getElementById('risk-weight');
+      
+      const benefitWeightValue = document.getElementById('benefit-weight-value');
+      const penaltyWeightValue = document.getElementById('penalty-weight-value');
+      const estimateWeightValue = document.getElementById('estimate-weight-value');
+      const riskWeightValue = document.getElementById('risk-weight-value');
+      
+      benefitWeightInput.addEventListener('input', (e) => {
+        benefitWeightValue.textContent = parseFloat(e.target.value).toFixed(1);
+      });
+      
+      penaltyWeightInput.addEventListener('input', (e) => {
+        penaltyWeightValue.textContent = parseFloat(e.target.value).toFixed(1);
+      });
+      
+      estimateWeightInput.addEventListener('input', (e) => {
+        estimateWeightValue.textContent = parseFloat(e.target.value).toFixed(1);
+      });
+      
+      riskWeightInput.addEventListener('input', (e) => {
+        riskWeightValue.textContent = parseFloat(e.target.value).toFixed(1);
+      });
+      
+      // Add event listeners to the buttons
+      const closeButton = document.getElementById('close-prioritization-dialog');
+      const resetButton = document.getElementById('reset-weights');
+      const saveButton = document.getElementById('save-weights');
+      
+      closeButton.addEventListener('click', () => {
+        document.body.removeChild(modalContainer);
+      });
+      
+      resetButton.addEventListener('click', () => {
+        // Reset to default values (1.5 for all weights)
+        benefitWeightInput.value = 1.5;
+        penaltyWeightInput.value = 1.5;
+        estimateWeightInput.value = 1.5;
+        riskWeightInput.value = 1.5;
+        
+        benefitWeightValue.textContent = '1.5';
+        penaltyWeightValue.textContent = '1.5';
+        estimateWeightValue.textContent = '1.5';
+        riskWeightValue.textContent = '1.5';
+      });
+      
+      saveButton.addEventListener('click', () => {
+        // Save the new weights
+        const newWeights = {
+          benefitWeight: parseFloat(benefitWeightInput.value),
+          penaltyWeight: parseFloat(penaltyWeightInput.value),
+          estimateWeight: parseFloat(estimateWeightInput.value),
+          riskWeight: parseFloat(riskWeightInput.value)
+        };
+        
+        updatePrioritizationWeights(newWeights);
+        document.body.removeChild(modalContainer);
+        
+        // Show a success toast
+        showToast('Prioritization weights updated successfully', 'success');
+        
+        // Update the UI to reflect the new weights
+        updateUI();
+        
+        // Auto-save the game state
+        autoSaveGame();
+      });
+    }
+    
+    // Update prioritization weights
+    function updatePrioritizationWeights(weights) {
+      gameState.prioritizationWeights = weights;
+    }
+    
+    // Auto-save game state
+    function autoSaveGame() {
+      localStorage.setItem('devops-infinity-save', JSON.stringify(gameState));
+      localStorage.setItem('devops-infinity-last-save', new Date().toISOString());
+      console.log('Auto-saved game');
+    }
+    
+    // Show a help dialog
+    function showHelpDialog() {
+      const helpContent = `
+        <div class="bg-dark-400 text-white p-6 rounded-lg max-w-2xl mx-auto">
+          <h2 class="text-xl font-bold mb-4">DevOps Infinity Game Help</h2>
+          
+          <p class="mb-3">Welcome to DevOps Infinity, a simulator game where you manage a virtual development pipeline!</p>
+          
+          <h3 class="text-lg font-bold mt-4 mb-2">Game Mechanics</h3>
+          <ul class="list-disc pl-5 space-y-1 mb-3">
+            <li><strong>Stories</strong> - Move items from Backlog to WIP to progress them. Stories deploy automatically when complete.</li>
+            <li><strong>Incidents</strong> - Random events affecting your system availability. Remediate them by spending DevOps Points.</li>
+            <li><strong>Upgrades</strong> - Purchase improvements to enhance your team's capabilities.</li>
+            <li><strong>DevOps Points (DP)</strong> - Currency earned by deploying stories and passively over time.</li>
+          </ul>
+          
+          <h3 class="text-lg font-bold mt-4 mb-2">Key Metrics</h3>
+          <ul class="list-disc pl-5 space-y-1 mb-3">
+            <li><strong>Deployment Frequency</strong> - How often you deploy code to production.</li>
+            <li><strong>System Availability</strong> - The health of your system. Affected by active incidents.</li>
+            <li><strong>Change Failure Rate</strong> - Percentage of deployments that cause incidents.</li>
+          </ul>
+          
+          <button id="close-help-button" class="btn btn-purple mt-4">Close</button>
+        </div>
+      `;
+      
+      // Create modal
+      const modal = document.createElement('div');
+      modal.id = 'help-dialog-modal';
+      modal.className = 'fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50';
+      modal.innerHTML = helpContent;
+      document.body.appendChild(modal);
+      
+      // Handle close button - use querySelector to find the button inside the modal
+      const closeBtn = modal.querySelector('#close-help-button');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          document.body.removeChild(modal);
+        });
+      }
+    }
+    
+    // This section used to contain duplicate toast notification code, which has been moved to the top of the script
+    
+    // Show detailed upgrades view
+    // Track filter preferences, load from localStorage if available
+    let hideMaxedUpgrades = localStorage.getItem('hideMaxedUpgrades') === 'true';
+    let showOnlyAvailable = localStorage.getItem('showOnlyAvailable') === 'true';
+    console.log("Initial settings - hideMaxedUpgrades:", hideMaxedUpgrades, "showOnlyAvailable:", showOnlyAvailable);
+    
+    function showUpgradesDetailView() {
+      // If there's already a modal open, remove it first
+      const existingModal = document.getElementById('upgrades-modal-container');
+      if (existingModal) {
+        document.body.removeChild(existingModal);
+        return;
+      }
+      
+      // Create modal container
+      const modalContainer = document.createElement('div');
+      modalContainer.id = 'upgrades-modal-container';
+      modalContainer.className = 'fixed inset-0 bg-dark-900 bg-opacity-80 flex items-center justify-center z-50 p-4 overflow-y-auto';
+      
+      // Filter upgrades by category for better organization
+      const upgradesByCategory = {};
+      const categoryNames = {
+        'CI_CD': 'CI/CD Pipeline',
+        'INFRASTRUCTURE': 'Infrastructure',
+        'TESTING': 'Testing & Quality',
+        'CULTURE': 'DevOps Culture',
+        'MONITORING': 'Monitoring & Alerts',
+        'DEVELOPMENT': 'Development',
+        'ARCHITECTURE': 'Architecture',
+        'SECURITY': 'Security'
+      };
+      
+      // Group upgrades by category, apply filters
+      gameState.upgrades.forEach(upgrade => {
+        // Skip maxed upgrades if hide toggle is checked
+        if (hideMaxedUpgrades && upgrade.currentLevel >= upgrade.maxLevel) {
+          return;
+        }
+        
+        // If 'showOnlyAvailable' is enabled, only show upgrades that are both unlocked 
+        // and not maxed (ignoring DP cost)
+        const isAvailable = upgrade.unlocked && upgrade.currentLevel < upgrade.maxLevel;
+        if (showOnlyAvailable && !isAvailable) {
+          return;
+        }
+        
+        const category = upgrade.category || 'OTHER';
+        if (!upgradesByCategory[category]) {
+          upgradesByCategory[category] = [];
+        }
+        upgradesByCategory[category].push(upgrade);
+      });
+      
+      // Create modal content
+      let upgradeSectionsHTML = '';
+      
+      // Create section for each category
+      Object.keys(upgradesByCategory).forEach(category => {
+        const upgrades = upgradesByCategory[category];
+        const displayName = categoryNames[category] || category;
+        
+        upgradeSectionsHTML += `
+          <div class="mb-6 pb-6 border-b border-dark-300 last:border-0">
+            <h3 class="text-lg font-bold mb-4 text-accent-purple">${displayName}</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        `;
+        
+        // Add each upgrade card
+        upgrades.forEach(upgrade => {
+          const canPurchase = gameState.metrics.devopsPoints >= upgrade.cost && 
+                           upgrade.currentLevel < upgrade.maxLevel;
+          
+          // Determine effect description based on effect type
+          let effectDescription = '';
+          switch(upgrade.effectType) {
+            case 'DEPLOYMENT_SPEEDUP':
+              effectDescription = 'Speeds up deployments';
+              break;
+            case 'AVAILABILITY_BOOST':
+              effectDescription = 'Improves system availability';
+              break;
+            case 'INCIDENT_REDUCTION':
+              effectDescription = 'Reduces incident occurrence';
+              break;
+            case 'DP_MULTIPLIER':
+              effectDescription = 'Increases DevOps Points gained';
+              break;
+            default:
+              effectDescription = 'Provides various benefits';
+          }
+          
+          // Get dependencies (not currently implemented in game data)
+          const dependencies = []; // This would be filled from upgrade.prerequisites if it existed
+          
+          upgradeSectionsHTML += `
+            <div id="upgrade-card-${upgrade.id}" class="bg-dark-400 rounded-lg p-4 relative ${!upgrade.unlocked ? 'opacity-60' : ''}">
+              ${!upgrade.unlocked ? '<div class="absolute inset-0 flex items-center justify-center bg-dark-800 bg-opacity-30 rounded-lg"><span class="text-white font-bold">Locked</span></div>' : ''}
+              <div class="flex justify-between items-start mb-3">
+                <h4 class="font-bold text-white">${upgrade.name}</h4>
+                <div class="bg-dark-500 px-2 py-1 rounded text-xs upgrade-level">
+                  Level ${upgrade.currentLevel}/${upgrade.maxLevel}
+                </div>
+              </div>
+              <p class="text-sm text-gray-300 mb-3">${upgrade.description}</p>
+              
+              <div class="text-xs text-gray-400 mb-3">
+                <div class="flex items-center mb-1">
+                  <svg class="w-4 h-4 mr-1 text-accent-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Effect: ${effectDescription}</span>
+                </div>
+                ${dependencies.length > 0 ? `
+                <div class="flex items-center">
+                  <svg class="w-4 h-4 mr-1 text-accent-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Dependencies: ${dependencies.join(', ')}</span>
+                </div>` : ''}
+              </div>
+              
+              <div class="flex justify-between items-center mt-4">
+                <div class="text-sm">
+                  <span class="text-accent-purple font-medium upgrade-cost">${upgrade.cost} DP</span>
+                </div>
+                ${upgrade.unlocked ? `
+                <button class="btn-sm ${canPurchase ? 'btn-purple' : 'bg-dark-300 text-gray-500'} ${!canPurchase ? 'opacity-50 cursor-not-allowed' : ''}"
+                        onclick="purchaseUpgrade(${upgrade.id})"
+                        ${!canPurchase ? 'disabled' : ''}>
+                  ${upgrade.currentLevel >= upgrade.maxLevel ? 'Maxed' : 'Purchase'}
+                </button>` : ''}
+              </div>
+              
+              ${upgrade.currentLevel > 0 ? `
+              <div class="mt-3 pt-3 border-t border-dark-300">
+                <div class="text-xs text-gray-400">
+                  <span class="font-medium">Current level effect:</span> ${upgrade.currentLevel * 15}% effectiveness
+                </div>
+              </div>` : ''}
+            </div>
+          `;
+        });
+        
+        upgradeSectionsHTML += `
+            </div>
+          </div>
+        `;
+      });
+      
+      const totalUnlockedUpgrades = gameState.upgrades.filter(u => u.unlocked).length;
+      const totalMaxedUpgrades = gameState.upgrades.filter(u => u.currentLevel >= u.maxLevel).length;
+      
+      const modalContent = `
+        <div class="bg-dark-500 rounded-lg w-full max-w-5xl shadow-2xl overflow-hidden">
+          <div class="flex justify-between items-center p-6 border-b border-dark-300">
+            <div>
+              <h2 class="text-2xl font-bold text-white">Upgrades & Technology Tree</h2>
+              <p class="text-gray-400 text-sm mt-1">Unlock improvements to boost your DevOps capabilities</p>
+            </div>
+            <div class="flex items-center">
+              <div class="mr-6 bg-dark-400 p-2 rounded-lg flex items-center">
+                <svg class="w-5 h-5 mr-2 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="modal-dp-display" class="font-bold text-white">${Math.floor(gameState.metrics.devopsPoints)}</span><span class="font-bold text-white"> DP</span>
+              </div>
+              <button id="close-upgrades-modal" class="text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="p-6 bg-dark-600">
+            <div class="flex justify-between items-center text-sm mb-6">
+              <div class="flex items-center gap-4">
+                <div>
+                  <span class="text-gray-400">Unlocked Upgrades:</span>
+                  <span class="font-medium text-white ml-1">${totalUnlockedUpgrades} / ${gameState.upgrades.length}</span>
+                </div>
+                <div>
+                  <span class="text-gray-400">Maxed Upgrades:</span>
+                  <span class="font-medium text-white ml-1">${totalMaxedUpgrades} / ${gameState.upgrades.length}</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button id="hide-maxed-button" class="btn btn-sm ${hideMaxedUpgrades ? 'btn-purple' : 'bg-dark-300 text-gray-400'} flex items-center">
+                  <span class="mr-2">${hideMaxedUpgrades ? '✓' : ''}</span>
+                  Hide Maxed
+                </button>
+                <button id="show-available-button" class="btn btn-sm ${showOnlyAvailable ? 'btn-purple' : 'bg-dark-300 text-gray-400'} flex items-center">
+                  <span class="mr-2">${showOnlyAvailable ? '✓' : ''}</span>
+                  Show Only Upgradable
+                </button>
+              </div>
+            </div>
+            
+            <div class="overflow-y-auto max-h-[70vh]">
+              ${upgradeSectionsHTML}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      modalContainer.innerHTML = modalContent;
+      document.body.appendChild(modalContainer);
+      
+      // Add event listener to close button
+      const closeButton = document.getElementById('close-upgrades-modal');
+      closeButton.addEventListener('click', () => {
+        document.body.removeChild(modalContainer);
+      });
+      
+      // Close when clicking outside the modal content
+      modalContainer.addEventListener('click', (event) => {
+        if (event.target === modalContainer) {
+          document.body.removeChild(modalContainer);
+        }
+      });
+      
+      // Add event listener to the hide maxed button
+      const hideMaxedButton = document.getElementById('hide-maxed-button');
+      if (hideMaxedButton) {
+        hideMaxedButton.addEventListener('click', () => {
+          // Toggle the state
+          hideMaxedUpgrades = !hideMaxedUpgrades;
+          console.log("Hide maxed clicked, set to:", hideMaxedUpgrades);
+          // Save setting to localStorage
+          localStorage.setItem('hideMaxedUpgrades', hideMaxedUpgrades);
+          // Refresh the modal to apply the filter
+          document.body.removeChild(modalContainer);
+          showUpgradesDetailView();
+        });
+      }
+      
+      // Add event listener to the show only available button
+      const showAvailableButton = document.getElementById('show-available-button');
+      if (showAvailableButton) {
+        showAvailableButton.addEventListener('click', () => {
+          // Toggle the state
+          showOnlyAvailable = !showOnlyAvailable;
+          console.log("Show available clicked, set to:", showOnlyAvailable);
+          // Save setting to localStorage
+          localStorage.setItem('showOnlyAvailable', showOnlyAvailable);
+          // Refresh the modal to apply the filter
+          document.body.removeChild(modalContainer);
+          showUpgradesDetailView();
+        });
+      }
+    }
+    
+    // Note: removeToast has been moved to the top of the script with the other toast notification methods
+    
+    // Function to activate a navigation item by its ID
+    function activateNavItem(navId) {
+      // Get all navigation items
+      const allNavItems = document.querySelectorAll('.sidebar-icon[id^="nav-"]');
+      
+      // Remove active class from all items
+      allNavItems.forEach(item => {
+        if (item) item.classList.remove('active');
+      });
+      
+      // Add active class to the clicked item
+      const clickedItem = document.getElementById(navId);
+      if (clickedItem) {
+        clickedItem.classList.add('active');
+      }
+      
+      // Handle the navigation change
+      handleNavigation(navId);
+    }
+  </script>
+  
+  <!-- Add direct script for the Kanban metrics toggle and navigation links -->
+  <script>
+    // Wait for DOM to be fully loaded
+    window.addEventListener('load', function() {
+      // Add event listener for Kanban metrics toggle
+      const toggleButton = document.getElementById('kanban-metrics-toggle');
+      if (toggleButton) {
+        toggleButton.addEventListener('click', function() {
+          const detailedMetrics = document.getElementById('detailed-metrics');
+          if (detailedMetrics) {
+            if (detailedMetrics.classList.contains('hidden')) {
+              // Show detailed metrics
+              detailedMetrics.classList.remove('hidden');
+              toggleButton.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                </svg>
+              `;
+            } else {
+              // Hide detailed metrics
+              detailedMetrics.classList.add('hidden');
+              toggleButton.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              `;
+            }
+          }
+        });
+      }
+      
+      // Add click handlers to all navigation links
+      document.getElementById('nav-upgrades').addEventListener('click', function(e) {
+        e.preventDefault();
+        showUpgradesDetailView();
+      });
+      
+      // Save game happens automatically at regular intervals
+      
+      // Game is automatically loaded on startup
+      
+      document.getElementById('reset-game').addEventListener('click', function(e) {
+        e.preventDefault();
+        resetGame();
+      });
+      
+      document.getElementById('nav-settings').addEventListener('click', function(e) {
+        e.preventDefault();
+        showPrioritizationSettingsDialog();
+      });
+      
+      document.getElementById('nav-help').addEventListener('click', function(e) {
+        e.preventDefault();
+        showHelpDialog();
+      });
+    });
+  </script>
+</body>
+</html>
